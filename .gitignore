@@ -127,4 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Idea
 .idea
+
+# Corpus
+corpus*.json
