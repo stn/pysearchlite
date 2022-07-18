@@ -133,3 +133,6 @@ dmypy.json
 
 # Corpus
 corpus*.json
+
+# Index
+idx/
