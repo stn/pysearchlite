@@ -1,4 +1,10 @@
-from .search_engine import *
+from .search_engine import (
+    index,
+    normalized_tokens,
+    restore_index,
+    save_index,
+    search,
+)
 
 
-VERSION = '0.2.0'
+VERSION = '0.2.1'
