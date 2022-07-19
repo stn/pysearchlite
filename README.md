@@ -23,12 +23,12 @@ but it is too large for our development,
 so we will extract only the first some lines.
 
 ```shell
-$ head -n 100 corpus.json > corpus100.json
+$ head -n 1000 corpus.json > corpus1k.json
 ```
 
 ### How to run
 
 To run a sample script
 ```shell
-$ python pysearchlite/main.py < corpus100.json
+$ python -m pysearchlite.commands.main.py < corpus1k.json
 ```
