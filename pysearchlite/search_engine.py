@@ -1,14 +1,16 @@
 import os
 import re
-
+from typing import Optional, TextIO
 
 ASCII = re.compile("[A-Za-z0-9]+")
 
 DOC_LIST_FILENAME = "doc_list"
 INVERTED_INDEX_FILENAME = "inverted_index"
 
-_doc_list: list[str] = []
-_inverted_index: dict[str, list[int]] = dict()
+_doc_list: list[str] = list()
+_inverted_index_raw: dict[str, list[int]] = dict()
+_inverted_index: dict[str, int] = dict()
+_inverted_index_fp: Optional[TextIO] = None
 
 
 def normalized_tokens(s: str) -> list[str]:
@@ -21,10 +23,10 @@ def _tokenize(s: str) -> list[str]:
 
 def _update_inverted_index(tokens: set, idx: int) -> None:
     for token in tokens:
-        if token in _inverted_index:
-            _inverted_index[token].append(idx)
+        if token in _inverted_index_raw:
+            _inverted_index_raw[token].append(idx)
         else:
-            _inverted_index[token] = [idx]
+            _inverted_index_raw[token] = [idx]
 
 
 def index(name: str, text: str):
@@ -36,6 +38,13 @@ def index(name: str, text: str):
     _update_inverted_index(tokens, idx)
 
 
+def clear_index() -> None:
+    global _doc_list, _inverted_index_raw, _inverted_index
+    _doc_list = list()
+    _inverted_index_raw = dict()
+    _inverted_index = dict()
+
+
 def save_doc_list(idx_dir: str) -> None:
     with open(os.path.join(idx_dir, DOC_LIST_FILENAME), 'w', encoding='utf-8') as f:
         for name in _doc_list:
@@ -45,7 +54,7 @@ def save_doc_list(idx_dir: str) -> None:
 
 def save_inverted_index(idx_dir: str) -> None:
     with open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'w', encoding='utf-8') as f:
-        for token, pos in _inverted_index.items():
+        for token, pos in _inverted_index_raw.items():
             f.write(token)
             f.write('\t')
             f.write(','.join(map(str, pos)))
@@ -66,13 +75,18 @@ def restore_doc_list(idx_dir: str) -> None:
 
 
 def restore_inverted_index(idx_dir: str) -> None:
-    global _inverted_index
+    global _inverted_index, _inverted_index_fp
     _inverted_index = dict()
     with open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'r', encoding='utf-8') as f:
-        for line in f:
+        pos = 0
+        line = f.readline()
+        while line:
             key_value = line[:-1].split('\t', maxsplit=1)
-            pos = list(map(int, key_value[1].split(',')))
-            _inverted_index[key_value[0]] = pos
+            key = key_value[0]
+            _inverted_index[key_value[0]] = pos + len(key.encode('utf-8')) + 1
+            pos = f.tell()
+            line = f.readline()
+    _inverted_index_fp = open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'r', encoding='utf-8')
 
 
 def restore_index(idx_dir: str) -> None:
@@ -80,11 +94,19 @@ def restore_index(idx_dir: str) -> None:
     restore_inverted_index(idx_dir)
 
 
+def _get_doc_ids(token: str) -> set[int]:
+    pos = _inverted_index.get(token, -1)
+    if pos < 0:
+        return set()
+    _inverted_index_fp.seek(pos)
+    return set(map(int, _inverted_index_fp.readline().split(',')))
+
+
 def search(query: str) -> list[str]:
     query_tokens = normalized_tokens(query)
     result = None
     for token in query_tokens:
-        ids = set(_inverted_index.get(token, []))
+        ids = _get_doc_ids(token)
         if result is None:
             result = ids
         else:
