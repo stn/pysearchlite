@@ -1,4 +1,5 @@
 from .search_engine import (
+    clear_index,
     index,
     normalized_tokens,
     restore_index,
@@ -7,4 +8,4 @@ from .search_engine import (
 )
 
 
-VERSION = '0.2.2'
+VERSION = '0.3.0'
