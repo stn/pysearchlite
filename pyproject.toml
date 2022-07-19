@@ -24,3 +24,6 @@ dynamic = ["version"]
 
 [tool.setuptools.dynamic]
 version = {attr = "pysearchlite.VERSION"}
+
+[tool.setuptools.packages.find]
+include = ["pysearchlite*"]
