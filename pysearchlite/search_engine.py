@@ -77,16 +77,15 @@ def restore_doc_list(idx_dir: str) -> None:
 def restore_inverted_index(idx_dir: str) -> None:
     global _inverted_index, _inverted_index_fp
     _inverted_index = dict()
-    with open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'r', encoding='utf-8') as f:
-        pos = 0
-        line = f.readline()
-        while line:
-            key_value = line[:-1].split('\t', maxsplit=1)
-            key = key_value[0]
-            _inverted_index[key_value[0]] = pos + len(key.encode('utf-8')) + 1
-            pos = f.tell()
-            line = f.readline()
     _inverted_index_fp = open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'r', encoding='utf-8')
+    pos = 0
+    line = _inverted_index_fp.readline()
+    while line:
+        key_value = line[:-1].split('\t', maxsplit=1)
+        key = key_value[0]
+        _inverted_index[key_value[0]] = pos + len(key.encode('utf-8')) + 1
+        pos = _inverted_index_fp.tell()
+        line = _inverted_index_fp.readline()
 
 
 def restore_index(idx_dir: str) -> None:
