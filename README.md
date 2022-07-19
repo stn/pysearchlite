@@ -30,7 +30,7 @@ $ head -n 100 corpus.json > corpus100.json
 
 To run a sample script,
 ```shell
-$ python -m pysearchlite.commands.main.py < corpus100.json
+$ python -m pysearchlite.commands.main < corpus100.json
 ```
 
 To run search-backend-game,
