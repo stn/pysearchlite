@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 
 import pysearchlite as psl
@@ -19,6 +20,7 @@ def main():
     for line in sys.stdin:
         d = json.loads(line)
         psl.index(d['id'], d['text'])
+    os.makedirs(INDEX_DIR, exist_ok=True)
     psl.save_index(INDEX_DIR)
     psl.restore_index(INDEX_DIR)
     # Search

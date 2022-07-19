@@ -36,13 +36,15 @@ def index(name: str, text: str):
     _update_inverted_index(tokens, idx)
 
 
-def save_index(idx_dir: str) -> None:
-    os.makedirs(idx_dir, exist_ok=True)
-    with open(os.path.join(idx_dir, 'doc_list'), 'w', encoding='utf-8') as f:
+def save_doc_list(idx_dir: str) -> None:
+    with open(os.path.join(idx_dir, DOC_LIST_FILENAME), 'w', encoding='utf-8') as f:
         for name in _doc_list:
             f.write(name)
             f.write('\n')
-    with open(os.path.join(idx_dir, 'inverted_index'), 'w', encoding='utf-8') as f:
+
+
+def save_inverted_index(idx_dir: str) -> None:
+    with open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'w', encoding='utf-8') as f:
         for token, pos in _inverted_index.items():
             f.write(token)
             f.write('\t')
@@ -50,18 +52,32 @@ def save_index(idx_dir: str) -> None:
             f.write('\n')
 
 
-def restore_index(idx_dir: str) -> None:
-    global _doc_list, _inverted_index
+def save_index(idx_dir: str) -> None:
+    save_doc_list(idx_dir)
+    save_inverted_index(idx_dir)
+
+
+def restore_doc_list(idx_dir: str) -> None:
+    global _doc_list
     _doc_list = []
-    _inverted_index = dict()
-    with open(os.path.join(idx_dir, 'doc_list'), 'r', encoding='utf-8') as f:
+    with open(os.path.join(idx_dir, DOC_LIST_FILENAME), 'r', encoding='utf-8') as f:
         for line in f:
             _doc_list.append(line[:-1])
-    with open(os.path.join(idx_dir, 'inverted_index'), 'r', encoding='utf-8') as f:
+
+
+def restore_inverted_index(idx_dir: str) -> None:
+    global _inverted_index
+    _inverted_index = dict()
+    with open(os.path.join(idx_dir, INVERTED_INDEX_FILENAME), 'r', encoding='utf-8') as f:
         for line in f:
             key_value = line[:-1].split('\t', maxsplit=1)
             pos = list(map(int, key_value[1].split(',')))
             _inverted_index[key_value[0]] = pos
+
+
+def restore_index(idx_dir: str) -> None:
+    restore_doc_list(idx_dir)
+    restore_inverted_index(idx_dir)
 
 
 def search(query: str) -> list[str]:
