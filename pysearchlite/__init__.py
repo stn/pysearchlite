@@ -6,7 +6,14 @@ from .search_engine import (
     search,
 )
 from .tokenize import normalized_tokens
-from .doc_list import DocList
-from .inverted_index import InvertedIndex
+from .doc_list import (
+    DocList,
+    MemoryDocList,
+)
+from .inverted_index import (
+    InvertedIndex,
+    AsciiFileInvertedIndex,
+    MemoryInvertedIndex,
+)
 
 VERSION = '0.3.1'

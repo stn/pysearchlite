@@ -1,10 +1,16 @@
-from .doc_list import DocList
-from .inverted_index import InvertedIndex
+from .doc_list import DocList, MemoryDocList
+from .inverted_index import (
+    InvertedIndex,
+    AsciiFileInvertedIndex,
+    MemoryInvertedIndex,
+)
 from .tokenize import normalized_tokens
 
 
-_doc_list = DocList()
-_inverted_index = InvertedIndex()
+_doc_list: DocList = MemoryDocList()
+
+# _inverted_index: InvertedIndex = MemoryInvertedIndex()
+_inverted_index: InvertedIndex = AsciiFileInvertedIndex()
 
 
 def index(name: str, text: str):

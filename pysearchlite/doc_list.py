@@ -1,10 +1,33 @@
+import abc
 import os
-
 
 DOC_LIST_FILENAME = "doc_list"
 
 
-class DocList(object):
+class DocList(abc.ABC):
+
+    @abc.abstractmethod
+    def add(self, name: str) -> int:
+        pass
+
+    @abc.abstractmethod
+    def get(self, idx: int) -> str:
+        pass
+
+    @abc.abstractmethod
+    def save(self, idx_dir: str):
+        pass
+
+    @abc.abstractmethod
+    def restore(self, idx_dir: str):
+        pass
+
+    @abc.abstractmethod
+    def clear(self):
+        pass
+
+
+class MemoryDocList(DocList):
 
     def __init__(self):
         self._list: list[str] = list()
