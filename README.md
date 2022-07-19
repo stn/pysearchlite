@@ -8,11 +8,11 @@ Lightweight Text Search Engine written in Python
 
 Prepare a JSON file which contains lines of "id" and "text".
 
-For example, [quickwit-oss/search-backend-game](https://github.com/quickwit-oss/search-benchmark-game)
+For example, [stn/search-backend-game](https://github.com/stn/search-benchmark-game)
 has made such corpus. You can use it.
 
 ```shell
-$ git clone https://github.com/quickwit-oss/search-benchmark-game.git 
+$ git clone https://github.com/stn/search-benchmark-game.git 
 $ cd search-benchmark-game
 $ make corpus
 ```
@@ -23,12 +23,23 @@ but it is too large for our development,
 so we will extract only the first some lines.
 
 ```shell
-$ head -n 1000 corpus.json > corpus1k.json
+$ head -n 100 corpus.json > corpus100.json
 ```
 
 ### How to run
 
-To run a sample script
+To run a sample script,
 ```shell
-$ python -m pysearchlite.commands.main.py < corpus1k.json
+$ python -m pysearchlite.commands.main.py < corpus100.json
+```
+
+To run search-backend-game,
+```shell
+# Go to the search-benchmark-game dir.
+# assume it's next of this repo.
+$ cd ../search-benchmark-game
+$ head -n 10000 corpus.json > corpus10k.json
+$ make CORPUS=`pwd`/corpus10k.json index
+$ make bench
+$ make serve
 ```
