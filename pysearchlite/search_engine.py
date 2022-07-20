@@ -18,7 +18,7 @@ def index(name: str, text: str):
 
     # consider a text as a bag of words for now.
     tokens = set(normalized_tokens(text))
-    _inverted_index.update(idx, tokens)
+    _inverted_index.add(idx, tokens)
 
 
 def clear_index():

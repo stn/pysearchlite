@@ -9,7 +9,7 @@ INVERTED_INDEX_FILENAME = "inverted_index"
 class InvertedIndex(abc.ABC):
 
     @abc.abstractmethod
-    def update(self, idx: int, tokens: set):
+    def add(self, idx: int, tokens: set):
         pass
 
     @abc.abstractmethod
@@ -34,7 +34,7 @@ class MemoryInvertedIndex(InvertedIndex):
     def __init__(self):
         self._data: dict[str, list[int]] = dict()
 
-    def update(self, idx: int, tokens: set):
+    def add(self, idx: int, tokens: set):
         for token in tokens:
             if token in self._data:
                 self._data[token].append(idx)
@@ -74,7 +74,7 @@ class AsciiFileInvertedIndex(InvertedIndex):
         self._data: dict[str, int] = dict()
         self._file: Optional[TextIO] = None
 
-    def update(self, idx: int, tokens: set):
+    def add(self, idx: int, tokens: set):
         for token in tokens:
             if token in self._raw_data:
                 self._raw_data[token].append(idx)
