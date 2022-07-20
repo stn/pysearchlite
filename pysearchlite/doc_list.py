@@ -29,28 +29,29 @@ class DocList(abc.ABC):
 
 class MemoryDocList(DocList):
 
-    def __init__(self):
-        self._list: list[str] = list()
+    def __init__(self, idx_dir: str):
+        self.idx_dir = idx_dir
+        self.doc_list: list[str] = list()
 
     def add(self, name: str) -> int:
-        idx = len(self._list)
-        self._list.append(name)
+        idx = len(self.doc_list)
+        self.doc_list.append(name)
         return idx
 
     def get(self, idx: int) -> str:
-        return self._list[idx]
+        return self.doc_list[idx]
 
-    def save(self, idx_dir: str):
-        with open(os.path.join(idx_dir, DOC_LIST_FILENAME), 'w', encoding='utf-8') as f:
-            for name in self._list:
+    def save(self):
+        with open(os.path.join(self.idx_dir, DOC_LIST_FILENAME), 'w', encoding='utf-8') as f:
+            for name in self.doc_list:
                 f.write(name)
                 f.write('\n')
 
-    def restore(self, idx_dir: str):
-        self._list = list()
-        with open(os.path.join(idx_dir, DOC_LIST_FILENAME), 'r', encoding='utf-8') as f:
+    def restore(self):
+        self.doc_list = list()
+        with open(os.path.join(self.idx_dir, DOC_LIST_FILENAME), 'r', encoding='utf-8') as f:
             for line in f:
-                self._list.append(line[:-1])
+                self.doc_list.append(line[:-1])
 
     def clear(self):
-        self._list = list()
+        self.doc_list = list()

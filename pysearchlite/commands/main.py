@@ -13,10 +13,9 @@ def main():
     for line in sys.stdin:
         d = json.loads(line)
         psl.index(d['id'], d['text'])
-    os.makedirs(INDEX_DIR, exist_ok=True)
-    psl.save_index(INDEX_DIR)
+    psl.save_index()
     psl.clear_index()
-    psl.restore_index(INDEX_DIR)
+    psl.restore_index()
     # Search
     print(psl.search('the'))
     print(psl.search('los angeles'))

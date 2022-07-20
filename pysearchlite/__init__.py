@@ -14,6 +14,7 @@ from .inverted_index import (
     InvertedIndex,
     AsciiFileInvertedIndex,
     MemoryInvertedIndex,
+    SortBasedInvertedIndex,
 )
 
-VERSION = '0.3.1'
+VERSION = '0.3.3'

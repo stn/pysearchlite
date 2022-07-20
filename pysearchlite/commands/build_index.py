@@ -10,7 +10,7 @@ def main(idx_dir):
     for line in sys.stdin:
         d = json.loads(line)
         psl.index(d['id'], d['text'])
-    psl.save_index(idx_dir)
+    psl.save_index()
 
 
 if __name__ == '__main__':
