@@ -3,11 +3,15 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import Optional, TextIO
-
+from collections import OrderedDict
+from sys import byteorder
+from typing import Optional, TextIO, BinaryIO
 
 INVERTED_INDEX_FILENAME = "inverted_index"
 
+TOKEN_LEN_BYTES = 2
+DOCID_BYTES = 4
+DOCID_LEN_BYTES = 4
 
 class InvertedIndex(abc.ABC):
 
@@ -76,7 +80,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def __init__(self, idx_dir: str, mem_limit=1000_000_000):
         self.idx_dir = idx_dir
         os.makedirs(idx_dir, exist_ok=True)
-        self.raw_data: dict[str, list[int]] = dict()
+        self.raw_data: dict[str, list[int]] = OrderedDict()
         self.data: dict[str, int] = dict()
         self.file: Optional[TextIO] = None
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="pysearchlite_")
@@ -101,54 +105,84 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def tmp_index_name(self, i: int):
         return os.path.join(self.tmp_dir.name, f"{i}")
 
+    def write_token(self, f: BinaryIO, token: str):
+        encoded_token = token.encode('utf-8')
+        f.write(len(encoded_token).to_bytes(TOKEN_LEN_BYTES, byteorder))
+        f.write(encoded_token)
+
+    def read_token(self, f: BinaryIO) -> str:
+        token_bytes = f.read(TOKEN_LEN_BYTES)
+        if not token_bytes:
+            return ""
+        token_len = int.from_bytes(token_bytes, byteorder)
+        return f.read(token_len).decode('utf-8')
+
+    def write_doc_ids(self, f: BinaryIO, doc_ids: list[int]):
+        f.write(len(doc_ids).to_bytes(DOCID_LEN_BYTES, byteorder))
+        for doc_id in doc_ids:
+            f.write(doc_id.to_bytes(DOCID_BYTES, byteorder))
+
     def save_raw_data(self):
-        with open(self.tmp_index_name(self.tmp_index_num), 'w', encoding='utf-8') as f:
-            for token in sorted(self.raw_data.keys()):
-                f.write(token)
-                f.write('\t')
-                f.write(','.join([str(pos) for pos in self.raw_data[token]]))
-                f.write('\n')
+        # [len(token)] [token] [len(ids)] [ids]
+        with open(self.tmp_index_name(self.tmp_index_num), 'wb') as f:
+            for token in self.raw_data.keys():
+                self.write_token(f, token)
+                doc_ids = self.raw_data[token]
+                self.write_doc_ids(f, doc_ids)
         self.raw_data = dict()
         self.raw_data_size = 0
         self.tmp_index_num += 1
 
-    def merge_index(self, idx1, idx2):
-        with open(idx1, 'r', encoding='utf-8') as f1:
-            with open(idx2, 'r', encoding='utf-8') as f2:
+    def merge_index(self, idx1: str, idx2: str):
+        def copy_ids(dst: BinaryIO, src: BinaryIO):
+            docid_bytes = src.read(DOCID_LEN_BYTES)
+            doc_ids_len = int.from_bytes(docid_bytes, byteorder)
+            dst.write(docid_bytes)
+            doc_ids_bytes = src.read(doc_ids_len * DOCID_BYTES)
+            dst.write(doc_ids_bytes)
+
+        def merge_ids(dst: BinaryIO, src1: BinaryIO, src2: BinaryIO):
+            doc_ids_len1 = int.from_bytes(src1.read(DOCID_LEN_BYTES), byteorder)
+            doc_ids_len2 = int.from_bytes(src2.read(DOCID_LEN_BYTES), byteorder)
+            dst.write((doc_ids_len1 + doc_ids_len2).to_bytes(DOCID_LEN_BYTES, byteorder))
+            doc_ids_bytes = src1.read(doc_ids_len1 * DOCID_BYTES)
+            dst.write(doc_ids_bytes)
+            doc_ids_bytes = src2.read(doc_ids_len2 * DOCID_BYTES)
+            dst.write(doc_ids_bytes)
+
+        with open(idx1, 'rb') as f1:
+            with open(idx2, 'rb') as f2:
                 merged_index_name = self.tmp_index_name(self.tmp_index_num)
                 self.tmp_index_num += 1
-                with open(merged_index_name, 'w', encoding='utf-8') as out:
-                    line1 = f1.readline()
-                    line2 = f2.readline()
+                with open(merged_index_name, 'wb') as out:
+                    token1 = self.read_token(f1)
+                    token2 = self.read_token(f2)
                     while True:
-                        if not line1 or line1 == "\n":
-                            while line2 and line2 != "\n":
-                                out.write(line2)
-                                line2 = f2.readline()
+                        if not token1:
+                            while token2:
+                                self.write_token(out, token2)
+                                copy_ids(out, f2)
+                                token2 = self.read_token(f2)
                             break
-                        if not line2 or line2 == "\n":
-                            while line1 and line1 != "\n":
-                                out.write(line1)
-                                line1 = f1.readline()
+                        if not token2:
+                            while token1:
+                                self.write_token(out, token1)
+                                copy_ids(out, f1)
+                                token1 = self.read_token(f1)
                             break
-                        tp1 = line1.split('\t', maxsplit=1)
-                        tp2 = line2.split('\t', maxsplit=1)
-                        token1 = tp1[0]
-                        token2 = tp2[0]
                         if token1 < token2:
-                            out.write(line1)
-                            line1 = f1.readline()
+                            self.write_token(out, token1)
+                            copy_ids(out, f1)
+                            token1 = self.read_token(f1)
                         elif token1 > token2:
-                            out.write(line2)
-                            line2 = f2.readline()
+                            self.write_token(out, token2)
+                            copy_ids(out, f2)
+                            token2 = self.read_token(f2)
                         else:
-                            out.write(token1)
-                            out.write('\t')
-                            out.write(tp1[1][:-1])  # remove the last \n
-                            out.write(',')
-                            out.write(tp2[1])
-                            line1 = f1.readline()
-                            line2 = f2.readline()
+                            self.write_token(out, token1)
+                            merge_ids(out, f1, f2)
+                            token1 = self.read_token(f1)
+                            token2 = self.read_token(f2)
         os.remove(idx1)
         os.remove(idx2)
         return merged_index_name
@@ -174,22 +208,23 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
 
     def restore(self):
         self.data = dict()
-        self.file = open(os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME), 'r', encoding='utf-8')
-        pos = 0
-        line = self.file.readline()
-        while line:
-            key_value = line[:-1].split('\t', maxsplit=1)
-            key = key_value[0]
-            self.data[key] = pos + len(key.encode('utf-8')) + 1
+        self.file = open(os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME), 'rb')
+        token = self.read_token(self.file)
+        while token:
             pos = self.file.tell()
-            line = self.file.readline()
+            self.data[token] = pos
+            ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
+            self.file.seek(ids_len * DOCID_BYTES, 1)
+            token = self.read_token(self.file)
 
     def get(self, token: str) -> set[int]:
         pos = self.data.get(token, -1)
         if pos < 0:
             return set()
         self.file.seek(pos)
-        return set(map(int, self.file.readline().split(',')))
+        ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
+        ids = [int.from_bytes(self.file.read(DOCID_BYTES), byteorder) for _ in range(ids_len)]
+        return set(ids)
 
     def clear(self):
         self.raw_data = dict()
