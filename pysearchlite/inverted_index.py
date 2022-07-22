@@ -1,5 +1,6 @@
 import abc
 import os
+import shutil
 import subprocess
 import tempfile
 from typing import Optional, TextIO
@@ -168,7 +169,8 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                     merged_index_f.extend(xs)
             tmp_index_f = merged_index_f
         # Copy the merged file into index
-        os.replace(tmp_index_f[0], os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME))
+        shutil.copyfile(tmp_index_f[0], os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME))
+        os.remove(tmp_index_f[0])
 
     def restore(self):
         self.data = dict()
