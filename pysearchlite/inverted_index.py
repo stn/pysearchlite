@@ -3,7 +3,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-from collections import OrderedDict
 from sys import byteorder
 from typing import Optional, TextIO, BinaryIO
 
@@ -80,7 +79,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def __init__(self, idx_dir: str, mem_limit=1000_000_000):
         self.idx_dir = idx_dir
         os.makedirs(idx_dir, exist_ok=True)
-        self.raw_data: dict[str, list[int]] = OrderedDict()
+        self.raw_data: dict[str, list[int]] = dict()
         self.data: dict[str, int] = dict()
         self.file: Optional[TextIO] = None
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="pysearchlite_")
@@ -125,7 +124,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def save_raw_data(self):
         # [len(token)] [token] [len(ids)] [ids]
         with open(self.tmp_index_name(self.tmp_index_num), 'wb') as f:
-            for token in self.raw_data.keys():
+            for token in sorted(self.raw_data.keys()): # TODO this consumes a lot of memory
                 self.write_token(f, token)
                 doc_ids = self.raw_data[token]
                 self.write_doc_ids(f, doc_ids)
