@@ -3,6 +3,7 @@ from .inverted_index import (
     InvertedIndex,
     AsciiFileInvertedIndex,
     MemoryInvertedIndex,
+    SinglePassInMemoryInvertedIndex,
     SortBasedInvertedIndex,
 )
 from .tokenize import normalized_tokens
@@ -14,7 +15,8 @@ doc_list: DocList = MemoryDocList(INDEX_DIR)
 
 # inverted_index: InvertedIndex = MemoryInvertedIndex(index_dir)
 # inverted_index: InvertedIndex = AsciiFileInvertedIndex(index_dir)
-inverted_index: InvertedIndex = SortBasedInvertedIndex(INDEX_DIR)
+# inverted_index: InvertedIndex = SortBasedInvertedIndex(INDEX_DIR)
+inverted_index: InvertedIndex = SinglePassInMemoryInvertedIndex(INDEX_DIR)
 
 
 def index(name: str, text: str):
