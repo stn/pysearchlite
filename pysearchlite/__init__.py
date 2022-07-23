@@ -1,5 +1,6 @@
 from .search_engine import (
     clear_index,
+    count,
     index,
     init,
     restore_index,
@@ -16,4 +17,4 @@ from .inverted_index import (
     MemoryInvertedIndex,
 )
 
-VERSION = '0.4.3'
+VERSION = '0.4.4'

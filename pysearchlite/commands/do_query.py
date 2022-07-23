@@ -11,7 +11,7 @@ def main(idx_dir):
         command = command_query[0]
         query = command_query[1]
         if command == 'COUNT':
-            count = len(psl.search(query))
+            count = psl.count(query)
         elif command == 'TOP_10':
             psl.search(query)
             count = 1
