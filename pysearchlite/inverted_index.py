@@ -2,6 +2,7 @@ import abc
 import os
 import shutil
 import tempfile
+from operator import itemgetter
 from sys import byteorder
 from typing import Optional, TextIO, BinaryIO
 
@@ -23,7 +24,7 @@ class InvertedIndex(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def search_and(self, token: str) -> list[int]:
+    def search_and(self, tokens: list[str]) -> list[int]:
         pass
 
     @abc.abstractmethod
@@ -57,7 +58,7 @@ class MemoryInvertedIndex(InvertedIndex):
         ids = self.data.get(token, [])
         return ids
 
-    def search_and(self, token: str) -> list[int]:
+    def search_and(self, tokens: list[str]) -> list[int]:
         raise NotImplementedError()
 
     def save(self):
@@ -232,8 +233,55 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         ids = [int.from_bytes(self.file.read(DOCID_BYTES), byteorder) for _ in range(ids_len)]
         return ids
 
-    def search_and(self, token: str) -> list[int]:
-        raise NotImplementedError()
+    def get_next_doc_id(self, pos):
+        self.file.seek(pos)
+        doc_id = int.from_bytes(self.file.read(DOCID_BYTES), byteorder)
+        return doc_id, pos + DOCID_BYTES
+
+    def search_and(self, tokens: list[str]) -> list[int]:
+        # confirm if all tokens are in index.
+        file_pos = []
+        for t in tokens:
+            pos = self.data.get(t, -1)
+            if pos < 0:
+                return []
+            file_pos.append(pos)
+
+        # state: a list of (remaining ids, next doc id, file position)
+        state = []
+        max_doc_id = -1
+        for pos in file_pos:
+            self.file.seek(pos)
+            doc_ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
+            doc_id = int.from_bytes(self.file.read(DOCID_BYTES), byteorder)
+            state.append((doc_ids_len - 1, doc_id, pos + DOCID_LEN_BYTES + DOCID_BYTES))
+            if doc_id > max_doc_id:
+                max_doc_id = doc_id
+        state.sort(key=itemgetter(0))
+
+        result = []
+        while True:
+            hit = True
+            for i, (num, doc_id, pos) in enumerate(state):
+                if doc_id < max_doc_id:
+                    hit = False
+                    if num == 0:
+                        return result
+                    next_doc_id, next_pos = self.get_next_doc_id(pos)
+                    state[i] = (num - 1, next_doc_id, next_pos)
+                    if next_doc_id > max_doc_id:
+                        max_doc_id = next_doc_id
+            if hit:
+                result.append(max_doc_id)
+                # increment all doc_ids
+                for i, (num, doc_id, pos) in enumerate(state):
+                    if num == 0:
+                        return result
+                    next_doc_id, next_pos = self.get_next_doc_id(pos)
+                    state[i] = (num - 1, next_doc_id, next_pos)
+                    if next_doc_id > max_doc_id:
+                        max_doc_id = next_doc_id
+        return result  # never reach here
 
     def clear(self):
         self.raw_data = dict()

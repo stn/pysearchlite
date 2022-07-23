@@ -26,8 +26,8 @@ def spim_index(idx_dir) -> SinglePassInMemoryInvertedIndex:
 
 
 def test_spim_add(spim_index):
-    spim_index.add(0, {'a', 'b', 'c'})
-    spim_index.add(1, {'a', 'c', 'd'})
+    spim_index.add(0, ['a', 'b', 'c'])
+    spim_index.add(1, ['a', 'c', 'd'])
     assert spim_index.raw_data == {'a': [0, 1], 'b': [0], 'c': [0, 1], 'd': [1]}
 
 
@@ -54,8 +54,8 @@ def test_write_doc_ids(spim_index):
 
 
 def test_save_raw_data(spim_index):
-    spim_index.add(0, {'c', 'b'})
-    spim_index.add(1, {'a', 'c'})
+    spim_index.add(0, ['c', 'b'])
+    spim_index.add(1, ['a', 'c'])
     spim_index.save_raw_data()
     with open(spim_index.tmp_index_name(0), 'rb') as f:
         tmp_index = f.read()
@@ -68,8 +68,8 @@ def test_save_raw_data(spim_index):
 
 
 def test_spim_save(spim_index):
-    spim_index.add(0, {'c', 'b'})
-    spim_index.add(1, {'a', 'c'})
+    spim_index.add(0, ['c', 'b'])
+    spim_index.add(1, ['a', 'c'])
     spim_index.save()
     with open(os.path.join(spim_index.idx_dir, 'inverted_index'), 'rb') as f:
         tmp_index = f.read()
@@ -93,10 +93,24 @@ def test_spim_get(spim_index):
                 b'\x01\x00b\x01\x00\x00\x00\x00\x00\x00\x00'
                 b'\x01\x00c\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00')
     spim_index.restore()
-    assert spim_index.get('a') == {1}
-    assert spim_index.get('b') == {0}
-    assert spim_index.get('c') == {0, 1}
-    assert len(spim_index.get('d')) == 0
+    assert spim_index.get('a') == [1]
+    assert spim_index.get('b') == [0]
+    assert spim_index.get('c') == [0, 1]
+    assert spim_index.get('d') == []
+
+
+def test_spim_search_and(spim_index):
+    with open(os.path.join(spim_index.idx_dir, 'inverted_index'), 'wb') as f:
+        f.write(b'\x01\x00a\x01\x00\x00\x00\x01\x00\x00\x00'
+                b'\x01\x00b\x01\x00\x00\x00\x00\x00\x00\x00'
+                b'\x01\x00c\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00')
+    spim_index.restore()
+    assert spim_index.search_and(['a', 'b']) == []
+    assert spim_index.search_and(['a', 'c']) == [1]
+    assert spim_index.search_and(['a', 'd']) == []
+    assert spim_index.search_and(['b', 'c']) == [0]
+    assert spim_index.search_and(['b', 'd']) == []
+    assert spim_index.search_and(['a', 'b', 'c']) == []
 
 
 def test_spim_clear(spim_index):
