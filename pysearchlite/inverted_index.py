@@ -16,11 +16,11 @@ DOCID_LEN_BYTES = 4
 class InvertedIndex(abc.ABC):
 
     @abc.abstractmethod
-    def add(self, idx: int, tokens: set):
+    def add(self, idx: int, tokens: list[str]):
         pass
 
     @abc.abstractmethod
-    def get(self, token: str) -> set[int]:
+    def get(self, token: str) -> list[int]:
         pass
 
     @abc.abstractmethod
@@ -43,16 +43,16 @@ class MemoryInvertedIndex(InvertedIndex):
         os.makedirs(idx_dir, exist_ok=True)
         self.data: dict[str, list[int]] = dict()
 
-    def add(self, idx: int, tokens: set):
-        for token in tokens:
+    def add(self, idx: int, tokens: list[str]):
+        for token in set(tokens):
             if token in self.data:
                 self.data[token].append(idx)
             else:
                 self.data[token] = [idx]
 
-    def get(self, token: str) -> set[int]:
+    def get(self, token: str) -> list[int]:
         ids = self.data.get(token, [])
-        return set(ids)
+        return ids
 
     def save(self):
         with open(os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME), 'w', encoding='utf-8') as f:
@@ -88,11 +88,11 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         self.raw_data_size = 0
         self.mem_limit = mem_limit
 
-    def add(self, idx: int, tokens: set):
+    def add(self, idx: int, tokens: list[str]):
         POS_SIZE = 10
         TOKEN_SIZE = 20
 
-        for token in tokens:
+        for token in set(tokens):
             if token in self.raw_data:
                 self.raw_data[token].append(idx)
                 self.raw_data_size += POS_SIZE
@@ -217,14 +217,14 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             self.file.seek(ids_len * DOCID_BYTES, 1)
             token = self.read_token(self.file)
 
-    def get(self, token: str) -> set[int]:
+    def get(self, token: str) -> list[int]:
         pos = self.data.get(token, -1)
         if pos < 0:
-            return set()
+            return list()
         self.file.seek(pos)
         ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
         ids = [int.from_bytes(self.file.read(DOCID_BYTES), byteorder) for _ in range(ids_len)]
-        return set(ids)
+        return ids
 
     def clear(self):
         self.raw_data = dict()
@@ -240,19 +240,19 @@ class AsciiFileInvertedIndex(InvertedIndex):
         self.data: dict[str, int] = dict()
         self.file: Optional[TextIO] = None
 
-    def add(self, idx: int, tokens: set):
-        for token in tokens:
+    def add(self, idx: int, tokens: list[str]):
+        for token in set(tokens):
             if token in self.raw_data:
                 self.raw_data[token].append(idx)
             else:
                 self.raw_data[token] = [idx]
 
-    def get(self, token: str) -> set[int]:
+    def get(self, token: str) -> list[int]:
         pos = self.data.get(token, -1)
         if pos < 0:
-            return set()
+            return list()
         self.file.seek(pos)
-        return set(map(int, self.file.readline().split(',')))
+        return list(map(int, self.file.readline().split(',')))
 
     def save(self):
         with open(os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME), 'w', encoding='utf-8') as f:
@@ -293,19 +293,19 @@ class SortBasedInvertedIndex(InvertedIndex):
         if self.term_doc_file is not None:
             self.term_doc_file.close()
 
-    def add(self, idx: int, tokens: set):
-        for token in tokens:
+    def add(self, idx: int, tokens: list[str]):
+        for token in set(tokens):
             self.term_doc_file.write(token)
             self.term_doc_file.write(' ')
             self.term_doc_file.write(str(idx))
             self.term_doc_file.write('\n')
 
-    def get(self, token: str) -> set[int]:
+    def get(self, token: str) -> list[int]:
         pos = self.data.get(token, -1)
         if pos < 0:
-            return set()
+            return list()
         self.file.seek(pos)
-        return set(map(int, self.file.readline().split(',')))
+        return list(map(int, self.file.readline().split(',')))
 
     def save(self):
         def save_term(term, doc_ids):

@@ -25,7 +25,7 @@ def index(name: str, text: str):
     idx = doc_list.add(name)
 
     # consider a text as a bag of words for now.
-    tokens = set(normalized_tokens(text))
+    tokens = normalized_tokens(text)
     inverted_index.add(idx, tokens)
 
 
@@ -47,8 +47,8 @@ def restore_index():
 def search(query: str) -> list[str]:
     query_tokens = normalized_tokens(query)
     result = None
-    for token in query_tokens:
-        ids = inverted_index.get(token)
+    for token in set(query_tokens):
+        ids = set(inverted_index.get(token))
         if result is None:
             result = ids
         else:
