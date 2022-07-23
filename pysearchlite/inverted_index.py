@@ -1,10 +1,11 @@
 import abc
+import mmap
 import os
 import shutil
 import tempfile
 from operator import itemgetter
 from sys import byteorder
-from typing import Optional, TextIO, BinaryIO
+from typing import Optional, TextIO, BinaryIO, Union
 
 INVERTED_INDEX_FILENAME = "inverted_index"
 
@@ -90,10 +91,17 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         self.raw_data: dict[str, list[int]] = dict()
         self.data: dict[str, int] = dict()
         self.file: Optional[TextIO] = None
+        self.mmap: Optional[mmap.mmap] = None
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="pysearchlite_")
         self.tmp_index_num = 0
         self.raw_data_size = 0
         self.mem_limit = mem_limit
+
+    def __del__(self):
+        if self.mmap:
+            self.mmap.close()
+        if self.file:
+            self.file.close()
 
     def add(self, idx: int, tokens: list[str]):
         POS_SIZE = 10
@@ -117,7 +125,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         f.write(len(encoded_token).to_bytes(TOKEN_LEN_BYTES, byteorder))
         f.write(encoded_token)
 
-    def read_token(self, f: BinaryIO) -> str:
+    def read_token(self, f: Union[BinaryIO, mmap.mmap]) -> str:
         token_bytes = f.read(TOKEN_LEN_BYTES)
         if not token_bytes:
             return ""
@@ -216,27 +224,31 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def restore(self):
         self.data = dict()
         self.file = open(os.path.join(self.idx_dir, INVERTED_INDEX_FILENAME), 'rb')
-        token = self.read_token(self.file)
+        self.mmap = mmap.mmap(self.file.fileno(), length=0, access=mmap.ACCESS_READ)
+        token = self.read_token(self.mmap)
         while token:
-            pos = self.file.tell()
+            pos = self.mmap.tell()
             self.data[token] = pos
-            ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
-            self.file.seek(ids_len * DOCID_BYTES, 1)
-            token = self.read_token(self.file)
+            ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), byteorder)
+            self.mmap.seek(ids_len * DOCID_BYTES, 1)
+            token = self.read_token(self.mmap)
 
     def get(self, token: str) -> list[int]:
         pos = self.data.get(token, -1)
         if pos < 0:
-            return list()
-        self.file.seek(pos)
-        ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
-        ids = [int.from_bytes(self.file.read(DOCID_BYTES), byteorder) for _ in range(ids_len)]
+            return []
+        ids_len = int.from_bytes(self.mmap[pos:pos+DOCID_LEN_BYTES], byteorder)
+        pos += DOCID_LEN_BYTES
+        ids = []
+        for _ in range(ids_len):
+            ids.append(int.from_bytes(self.mmap[pos:pos+DOCID_BYTES], byteorder))
+            pos += DOCID_BYTES
         return ids
 
     def next_doc_id(self, pos):
-        self.file.seek(pos)
-        doc_id = int.from_bytes(self.file.read(DOCID_BYTES), byteorder)
-        return doc_id, pos + DOCID_BYTES
+        npos = pos + DOCID_BYTES
+        doc_id = int.from_bytes(self.mmap[pos:npos], byteorder)
+        return doc_id, npos
 
     def search_and(self, tokens: list[str]) -> list[int]:
         if len(tokens) == 1:
@@ -254,10 +266,11 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         state = []
         max_doc_id = -1
         for pos in file_pos:
-            self.file.seek(pos)
-            doc_ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), byteorder)
-            doc_id = int.from_bytes(self.file.read(DOCID_BYTES), byteorder)
-            state.append((doc_ids_len - 1, doc_id, pos + DOCID_LEN_BYTES + DOCID_BYTES))
+            npos = pos + DOCID_LEN_BYTES
+            doc_ids_len = int.from_bytes(self.mmap[pos:npos], byteorder)
+            npos2 = npos + DOCID_BYTES
+            doc_id = int.from_bytes(self.mmap[npos:npos2], byteorder)
+            state.append((doc_ids_len - 1, doc_id, npos2))
             if doc_id > max_doc_id:
                 max_doc_id = doc_id
         state.sort(key=itemgetter(0))
