@@ -12,6 +12,7 @@ TOKEN_LEN_BYTES = 2
 DOCID_BYTES = 4
 DOCID_LEN_BYTES = 4
 
+
 class InvertedIndex(abc.ABC):
 
     @abc.abstractmethod
@@ -124,7 +125,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def save_raw_data(self):
         # [len(token)] [token] [len(ids)] [ids]
         with open(self.tmp_index_name(self.tmp_index_num), 'wb') as f:
-            for token in sorted(self.raw_data.keys()): # TODO this consumes a lot of memory
+            for token in sorted(self.raw_data.keys()):  # TODO this consumes a lot of memory
                 self.write_token(f, token)
                 doc_ids = self.raw_data[token]
                 self.write_doc_ids(f, doc_ids)

@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 
 import pysearchlite as psl
