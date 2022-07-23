@@ -1,5 +1,7 @@
 # pysearchlite
 
+[![Python package](https://github.com/stn/pysearchlite/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/stn/pysearchlite/actions/workflows/python-package.yml)
+
 Lightweight Text Search Engine written in Python
 
 ## Usage
