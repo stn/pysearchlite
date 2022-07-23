@@ -13,9 +13,7 @@ from .doc_list import (
 )
 from .inverted_index import (
     InvertedIndex,
-    AsciiFileInvertedIndex,
     MemoryInvertedIndex,
-    SortBasedInvertedIndex,
 )
 
 VERSION = '0.4.2'

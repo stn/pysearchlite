@@ -3,10 +3,8 @@ from typing import Optional
 from .doc_list import DocList, MemoryDocList
 from .inverted_index import (
     InvertedIndex,
-    AsciiFileInvertedIndex,
     MemoryInvertedIndex,
     SinglePassInMemoryInvertedIndex,
-    SortBasedInvertedIndex,
 )
 from .tokenize import normalized_tokens
 
@@ -46,11 +44,8 @@ def restore_index():
 
 def search(query: str) -> list[str]:
     query_tokens = normalized_tokens(query)
-    result = None
-    for token in set(query_tokens):
-        ids = set(inverted_index.get(token))
-        if result is None:
-            result = ids
-        else:
-            result &= ids
-    return list(map(lambda x: doc_list.get(x), result))
+    if len(query_tokens) == 1:
+        doc_ids = inverted_index.get(query_tokens[0])
+    else:
+        doc_ids = inverted_index.search_and(query_tokens)
+    return [doc_list.get(doc_id) for doc_id in doc_ids]
