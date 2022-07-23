@@ -102,7 +102,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         if self.raw_data_size > self.mem_limit:
             self.save_raw_data()
 
-    def tmp_index_name(self, i: int):
+    def tmp_index_name(self, i: int) -> str:
         return os.path.join(self.tmp_dir.name, f"{i}")
 
     def write_token(self, f: BinaryIO, token: str):
