@@ -233,12 +233,15 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         ids = [int.from_bytes(self.file.read(DOCID_BYTES), byteorder) for _ in range(ids_len)]
         return ids
 
-    def get_next_doc_id(self, pos):
+    def next_doc_id(self, pos):
         self.file.seek(pos)
         doc_id = int.from_bytes(self.file.read(DOCID_BYTES), byteorder)
         return doc_id, pos + DOCID_BYTES
 
     def search_and(self, tokens: list[str]) -> list[int]:
+        if len(tokens) == 1:
+            return self.get(tokens[0])
+
         # confirm if all tokens are in index.
         file_pos = []
         for t in tokens:
@@ -267,20 +270,30 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                     hit = False
                     if num == 0:
                         return result
-                    next_doc_id, next_pos = self.get_next_doc_id(pos)
-                    state[i] = (num - 1, next_doc_id, next_pos)
-                    if next_doc_id > max_doc_id:
-                        max_doc_id = next_doc_id
+                    while True:
+                        doc_id, pos = self.next_doc_id(pos)
+                        num -= 1
+                        if doc_id == max_doc_id:
+                            state[i] = (num, doc_id, pos)
+                            break
+                        elif doc_id > max_doc_id:
+                            state[i] = (num, doc_id, pos)
+                            max_doc_id = doc_id
+                            break
+                        if num == 0:
+                            return result
+                    if not hit:
+                        break
             if hit:
                 result.append(max_doc_id)
                 # increment all doc_ids
                 for i, (num, doc_id, pos) in enumerate(state):
                     if num == 0:
                         return result
-                    next_doc_id, next_pos = self.get_next_doc_id(pos)
-                    state[i] = (num - 1, next_doc_id, next_pos)
-                    if next_doc_id > max_doc_id:
-                        max_doc_id = next_doc_id
+                    doc_id, pos = self.next_doc_id(pos)
+                    state[i] = (num - 1, doc_id, pos)
+                    if doc_id > max_doc_id:
+                        max_doc_id = doc_id
         return result  # never reach here
 
     def clear(self):
