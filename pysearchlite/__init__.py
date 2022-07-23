@@ -18,4 +18,4 @@ from .inverted_index import (
     SortBasedInvertedIndex,
 )
 
-VERSION = '0.4.0'
+VERSION = '0.4.1'
