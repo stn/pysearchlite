@@ -1,3 +1,5 @@
+from typing import Optional
+
 from .doc_list import DocList, MemoryDocList
 from .inverted_index import (
     InvertedIndex,
@@ -9,14 +11,14 @@ from .inverted_index import (
 from .tokenize import normalized_tokens
 
 
-INDEX_DIR: str = "idx"
+doc_list: Optional[DocList] = None
+inverted_index: Optional[InvertedIndex] = None
 
-doc_list: DocList = MemoryDocList(INDEX_DIR)
 
-# inverted_index: InvertedIndex = MemoryInvertedIndex(index_dir)
-# inverted_index: InvertedIndex = AsciiFileInvertedIndex(index_dir)
-# inverted_index: InvertedIndex = SortBasedInvertedIndex(INDEX_DIR)
-inverted_index: InvertedIndex = SinglePassInMemoryInvertedIndex(INDEX_DIR)
+def init(idx_dir: str):
+    global doc_list, inverted_index
+    doc_list = MemoryDocList(idx_dir)
+    inverted_index = SinglePassInMemoryInvertedIndex(idx_dir)
 
 
 def index(name: str, text: str):

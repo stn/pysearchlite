@@ -1,6 +1,7 @@
 from .search_engine import (
     clear_index,
     index,
+    init,
     restore_index,
     save_index,
     search,

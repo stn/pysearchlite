@@ -3,7 +3,8 @@ import sys
 import pysearchlite as psl
 
 
-def main():
+def main(idx_dir):
+    psl.init(idx_dir)
     psl.restore_index()
     for line in sys.stdin:
         command_query = line.split('\t')
@@ -24,4 +25,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1])

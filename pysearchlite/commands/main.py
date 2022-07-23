@@ -4,10 +4,8 @@ import sys
 import pysearchlite as psl
 
 
-INDEX_DIR = 'idx'
-
-
 def main():
+    psl.init('idx')
     # Index
     for line in sys.stdin:
         d = json.loads(line)
