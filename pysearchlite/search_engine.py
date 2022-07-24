@@ -53,8 +53,4 @@ def search(query: str) -> list[str]:
 
 def count(query: str) -> int:
     query_tokens = normalized_tokens(query)
-    if len(query_tokens) == 1:
-        doc_ids = inverted_index.get(query_tokens[0])
-    else:
-        doc_ids = inverted_index.search_and(query_tokens)
-    return len(doc_ids)
+    return inverted_index.count_and(query_tokens)

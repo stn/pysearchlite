@@ -32,6 +32,10 @@ class InvertedIndex(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def count_and(self, tokens: list[str]) -> int:
+        pass
+
+    @abc.abstractmethod
     def save(self):
         pass
 
@@ -63,6 +67,9 @@ class MemoryInvertedIndex(InvertedIndex):
         return ids
 
     def search_and(self, tokens: list[str]) -> list[int]:
+        raise NotImplementedError()
+
+    def count_and(self, tokens: list[str]) -> int:
         raise NotImplementedError()
 
     def save(self):
@@ -299,6 +306,56 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                 right = n - 1
             doc_ids = result
         return [int.from_bytes(doc_id, BYTEORDER) for doc_id in doc_ids]
+
+    def count_and(self, tokens: list[str]) -> int:
+        if len(tokens) == 1:
+            pos = self.data.get(tokens[0], -1)
+            if pos < 0:
+                return 0
+            ids_len = int.from_bytes(self.mmap[pos:pos + DOCID_LEN_BYTES], BYTEORDER)
+            return ids_len
+
+        # confirm if all tokens are in index.
+        file_pos = []
+        for t in tokens:
+            pos = self.data.get(t, -1)
+            if pos < 0:
+                return 0
+            file_pos.append(pos)
+
+        # state: a list of (n, file position, left)
+        state = []
+        for pos in file_pos:
+            npos = pos + DOCID_LEN_BYTES
+            doc_ids_len = int.from_bytes(self.mmap[pos:npos], BYTEORDER)
+            state.append((doc_ids_len, npos, 0))
+        state.sort(key=itemgetter(0))
+
+        # set the initial doc ids from the first doc id list.
+        doc_ids = []
+        n, pos, _ = state[0]
+        for _ in range(n):
+            doc_ids.append(self.mmap[pos:pos+DOCID_BYTES])
+            pos += DOCID_BYTES
+        # find common doc ids
+        for i in range(1, len(state)):
+            n, pos, left = state[i]
+            right = n - 1
+            result = []
+            for doc_id in doc_ids:
+                while left != right:
+                    m = math.ceil((left + right) / 2)  # which is faster ((left + right) // 2) + (left + right) % 2)
+                    m_pos = pos + m * DOCID_BYTES
+                    if self.mmap[m_pos:m_pos+DOCID_BYTES] > doc_id:
+                        right = m - 1
+                    else:
+                        left = m
+                l_pos = pos + left * DOCID_BYTES
+                if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
+                    result.append(doc_id)
+                right = n - 1
+            doc_ids = result
+        return len(doc_ids)
 
     def clear(self):
         self.raw_data = dict()
