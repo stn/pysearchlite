@@ -4,14 +4,16 @@ import os
 import shutil
 import tempfile
 from operator import itemgetter
-from typing import Optional, TextIO, BinaryIO, Union
+from typing import Optional, TextIO, BinaryIO, Union, Literal
 
 INVERTED_INDEX_FILENAME = "inverted_index"
 
-BYTEORDER = "big"
 TOKEN_LEN_BYTES = 2
 DOCID_BYTES = 4
 DOCID_LEN_BYTES = 4
+
+BYTEORDER: Literal["big"] = "big"
+B_INT32_0 = b"\x00\x00\x00\x00"
 
 
 class InvertedIndex(abc.ABC):
@@ -122,6 +124,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
 
     def write_token(self, f: BinaryIO, token: str):
         encoded_token = token.encode('utf-8')
+        # TODO: check overflow
         f.write(len(encoded_token).to_bytes(TOKEN_LEN_BYTES, BYTEORDER))
         f.write(encoded_token)
 
@@ -245,9 +248,9 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             pos += DOCID_BYTES
         return ids
 
-    def next_doc_id(self, pos):
+    def next_doc_id(self, pos: int) -> (bytes, int):
         npos = pos + DOCID_BYTES
-        doc_id = int.from_bytes(self.mmap[pos:npos], BYTEORDER)
+        doc_id = self.mmap[pos:npos]
         return doc_id, npos
 
     def search_and(self, tokens: list[str]) -> list[int]:
@@ -264,12 +267,12 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
 
         # state: a list of (remaining ids, next doc id, file position)
         state = []
-        max_doc_id = -1
+        max_doc_id = B_INT32_0
         for pos in file_pos:
             npos = pos + DOCID_LEN_BYTES
             doc_ids_len = int.from_bytes(self.mmap[pos:npos], BYTEORDER)
             npos2 = npos + DOCID_BYTES
-            doc_id = int.from_bytes(self.mmap[npos:npos2], BYTEORDER)
+            doc_id = self.mmap[npos:npos2]
             state.append((doc_ids_len - 1, doc_id, npos2))
             if doc_id > max_doc_id:
                 max_doc_id = doc_id
@@ -298,7 +301,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                     if not hit:
                         break
             if hit:
-                result.append(max_doc_id)
+                result.append(int.from_bytes(max_doc_id, BYTEORDER))
                 # increment all doc_ids
                 for i, (num, doc_id, pos) in enumerate(state):
                     if num == 0:
