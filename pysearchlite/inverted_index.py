@@ -261,16 +261,6 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         doc_id = self.mmap[pos:npos]
         return doc_id, npos
 
-    def binary_search_left(self, left: int, right: int, pos: int, doc_id: bytes) -> int:
-        while left != right:
-            m = math.ceil((left + right) / 2)  # which is faster ((left + right) // 2) + (left + right) % 2)
-            m_pos = pos + m * DOCID_BYTES
-            if self.mmap[m_pos:m_pos + DOCID_BYTES] > doc_id:
-                right = m - 1
-            else:
-                left = m
-        return left
-
     def prepare_state(self, tokens: list[str]) -> list[(int, int, int)]:
         # confirm if all tokens are in index.
         file_pos = []
@@ -287,6 +277,28 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             state.append((doc_ids_len, npos, 0))
         state.sort(key=itemgetter(0))
         return state
+
+    def binary_search_left(self, left: int, right: int, pos: int, doc_id: bytes) -> int:
+        while left != right:
+            # m = math.ceil((left + right) / 2)
+            lr = left + right
+            m = (lr // 2) + (lr % 2)
+            m_pos = pos + m * DOCID_BYTES
+            if self.mmap[m_pos:m_pos + DOCID_BYTES] > doc_id:
+                right = m - 1
+            else:
+                left = m
+        return left
+
+    def binary_search_right(self, left: int, right: int, pos: int, doc_id: bytes) -> int:
+        while left != right:
+            m = (left + right) // 2
+            m_pos = pos + m * DOCID_BYTES
+            if self.mmap[m_pos:m_pos + DOCID_BYTES] < doc_id:
+                left = m + 1
+            else:
+                right = m
+        return right
 
     def search_and(self, tokens: list[str]) -> list[int]:
         if len(tokens) == 1:
@@ -307,11 +319,26 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             n, pos, left = state[i]
             right = n - 1
             result = []
-            for doc_id in doc_ids:
-                left = self.binary_search_left(left, right, pos, doc_id)
-                l_pos = pos + left * DOCID_BYTES
-                if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
-                    result.append(doc_id)
+            from_left = True
+            left_i = 0
+            right_i = len(doc_ids) - 1
+            while left_i <= right_i:
+                if from_left:
+                    doc_id = doc_ids[left_i]
+                    left = self.binary_search_left(left, right, pos, doc_id)
+                    l_pos = pos + left * DOCID_BYTES
+                    if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
+                        result.append(doc_id)
+                    left_i += 1
+                    from_left = False
+                else:
+                    doc_id = doc_ids[right_i]
+                    right = self.binary_search_right(left, right, pos, doc_id)
+                    r_pos = pos + right * DOCID_BYTES
+                    if self.mmap[r_pos:r_pos+DOCID_BYTES] == doc_id:
+                        result.append(doc_id)
+                    right_i -= 1
+                    from_left = True
             doc_ids = result
         return [int.from_bytes(doc_id, BYTEORDER) for doc_id in doc_ids]
 
@@ -338,11 +365,26 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             n, pos, left = state[i]
             right = n - 1
             result = []
-            for doc_id in doc_ids:
-                left = self.binary_search_left(left, right, pos, doc_id)
-                l_pos = pos + left * DOCID_BYTES
-                if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
-                    result.append(doc_id)
+            from_left = True
+            left_i = 0
+            right_i = len(doc_ids) - 1
+            while left_i <= right_i:
+                if from_left:
+                    doc_id = doc_ids[left_i]
+                    left = self.binary_search_left(left, right, pos, doc_id)
+                    l_pos = pos + left * DOCID_BYTES
+                    if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
+                        result.append(doc_id)
+                    left_i += 1
+                    from_left = False
+                else:
+                    doc_id = doc_ids[right_i]
+                    right = self.binary_search_right(left, right, pos, doc_id)
+                    r_pos = pos + right * DOCID_BYTES
+                    if self.mmap[r_pos:r_pos+DOCID_BYTES] == doc_id:
+                        result.append(doc_id)
+                    right_i -= 1
+                    from_left = True
             doc_ids = result
         return len(doc_ids)
 
