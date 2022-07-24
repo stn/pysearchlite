@@ -1,4 +1,5 @@
 import abc
+import math
 import mmap
 import os
 import shutil
@@ -265,52 +266,39 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                 return []
             file_pos.append(pos)
 
-        # state: a list of (remaining ids, next doc id, file position)
+        # state: a list of (n, file position, left)
         state = []
-        max_doc_id = B_INT32_0
         for pos in file_pos:
             npos = pos + DOCID_LEN_BYTES
             doc_ids_len = int.from_bytes(self.mmap[pos:npos], BYTEORDER)
-            npos2 = npos + DOCID_BYTES
-            doc_id = self.mmap[npos:npos2]
-            state.append((doc_ids_len - 1, doc_id, npos2))
-            if doc_id > max_doc_id:
-                max_doc_id = doc_id
+            state.append((doc_ids_len, npos, 0))
         state.sort(key=itemgetter(0))
 
-        result = []
-        while True:
-            hit = True
-            for i, (num, doc_id, pos) in enumerate(state):
-                if doc_id < max_doc_id:
-                    hit = False
-                    if num == 0:
-                        return result
-                    while True:
-                        doc_id, pos = self.next_doc_id(pos)
-                        num -= 1
-                        if doc_id == max_doc_id:
-                            state[i] = (num, doc_id, pos)
-                            break
-                        elif doc_id > max_doc_id:
-                            state[i] = (num, doc_id, pos)
-                            max_doc_id = doc_id
-                            break
-                        if num == 0:
-                            return result
-                    if not hit:
-                        break
-            if hit:
-                result.append(int.from_bytes(max_doc_id, BYTEORDER))
-                # increment all doc_ids
-                for i, (num, doc_id, pos) in enumerate(state):
-                    if num == 0:
-                        return result
-                    doc_id, pos = self.next_doc_id(pos)
-                    state[i] = (num - 1, doc_id, pos)
-                    if doc_id > max_doc_id:
-                        max_doc_id = doc_id
-        return result  # never reach here
+        # set the initial doc ids from the first doc id list.
+        doc_ids = []
+        n, pos, _ = state[0]
+        for _ in range(n):
+            doc_ids.append(self.mmap[pos:pos+DOCID_BYTES])
+            pos += DOCID_BYTES
+        # find common doc ids
+        for i in range(1, len(state)):
+            n, pos, left = state[i]
+            right = n - 1
+            result = []
+            for doc_id in doc_ids:
+                while left != right:
+                    m = math.ceil((left + right) / 2)  # which is faster ((left + right) // 2) + (left + right) % 2)
+                    m_pos = pos + m * DOCID_BYTES
+                    if self.mmap[m_pos:m_pos+DOCID_BYTES] > doc_id:
+                        right = m - 1
+                    else:
+                        left = m
+                l_pos = pos + left * DOCID_BYTES
+                if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
+                    result.append(doc_id)
+                right = n - 1
+            doc_ids = result
+        return [int.from_bytes(doc_id, BYTEORDER) for doc_id in doc_ids]
 
     def clear(self):
         self.raw_data = dict()
