@@ -3,6 +3,7 @@ import math
 import mmap
 import os
 import shutil
+import sys
 import tempfile
 from operator import itemgetter
 from typing import Optional, TextIO, BinaryIO, Union, Literal
@@ -13,7 +14,7 @@ TOKEN_LEN_BYTES = 2
 DOCID_BYTES = 4
 DOCID_LEN_BYTES = 4
 
-BYTEORDER: Literal["big"] = "big"
+BYTEORDER: Literal["big", "little"] = "big"
 B_INT32_0 = b"\x00\x00\x00\x00"
 
 
@@ -300,6 +301,23 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                 right = m
         return right
 
+    def intersect_by_double_binary_search(self,
+                                          a: list[bytes], left_a: int, right_a: int,
+                                          pos_b: int, left_b: int, right_b: int,
+                                          result: list[bytes]):
+        if left_a > right_a or left_b > right_b:
+            return
+        ma = (left_a + right_a) // 2
+        ma_val = a[ma]
+        mb = self.binary_search_right(left_b, right_b, pos_b, ma_val)
+        mb_pos = pos_b + mb * DOCID_BYTES
+        self.intersect_by_double_binary_search(a, left_a, ma - 1, pos_b, left_b, mb - 1, result)
+        if self.mmap[mb_pos:mb_pos+DOCID_BYTES] == ma_val:
+            result.append(ma_val)
+            self.intersect_by_double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
+        else:
+            self.intersect_by_double_binary_search(a, ma + 1, right_a, pos_b, mb, right_b, result)
+
     def search_and(self, tokens: list[str]) -> list[int]:
         if len(tokens) == 1:
             return self.get(tokens[0])
@@ -361,30 +379,9 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             doc_ids.append(self.mmap[pos:pos+DOCID_BYTES])
             pos += DOCID_BYTES
         # find common doc ids
-        for i in range(1, len(state)):
-            n, pos, left = state[i]
-            right = n - 1
+        for i, (n_b, pos_b, _) in enumerate(state[1:]):
             result = []
-            from_left = True
-            left_i = 0
-            right_i = len(doc_ids) - 1
-            while left_i <= right_i:
-                if from_left:
-                    doc_id = doc_ids[left_i]
-                    left = self.binary_search_left(left, right, pos, doc_id)
-                    l_pos = pos + left * DOCID_BYTES
-                    if self.mmap[l_pos:l_pos+DOCID_BYTES] == doc_id:
-                        result.append(doc_id)
-                    left_i += 1
-                    from_left = False
-                else:
-                    doc_id = doc_ids[right_i]
-                    right = self.binary_search_right(left, right, pos, doc_id)
-                    r_pos = pos + right * DOCID_BYTES
-                    if self.mmap[r_pos:r_pos+DOCID_BYTES] == doc_id:
-                        result.append(doc_id)
-                    right_i -= 1
-                    from_left = True
+            self.intersect_by_double_binary_search(doc_ids, 0, len(doc_ids) - 1, pos_b, 0, n_b - 1, result)
             doc_ids = result
         return len(doc_ids)
 
