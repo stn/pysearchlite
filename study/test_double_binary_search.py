@@ -43,10 +43,6 @@ def double_binary_search_test_cases(num, max_len):
 
 
 @pytest.mark.parametrize('a, b', double_binary_search_test_cases(100, 20))
-#@pytest.mark.parametrize('a, b', [
-#    ([1, 2, 8, 11], [1, 8, 10, 11]),
-#    ([0, 1, 3, 8], [0, 8, 12, 15]),
-#])
 def test_double_binary_search(a, b):
     result = []
     intersect_by_double_binary_search(a, 0, len(a), b, 0, len(b), result)
