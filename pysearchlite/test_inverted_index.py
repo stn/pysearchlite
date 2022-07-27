@@ -124,6 +124,20 @@ def test_spim_search_and(spim_index):
     assert spim_index.search_and(['a', 'b', 'c']) == []
 
 
+def test_spim_count_and(spim_index):
+    with open(os.path.join(spim_index.idx_dir, 'inverted_index'), 'wb') as f:
+        f.write(B_INT16_1 + b'a' + B_INT32_1 + B_INT32_1 +
+                B_INT16_1 + b'b' + B_INT32_1 + B_INT32_0 +
+                B_INT16_1 + b'c' + B_INT32_2 + B_INT32_0 + B_INT32_1)
+    spim_index.restore()
+    assert spim_index.count_and(['a', 'b']) == 0
+    assert spim_index.count_and(['a', 'c']) == 1
+    assert spim_index.count_and(['a', 'd']) == 0
+    assert spim_index.count_and(['b', 'c']) == 1
+    assert spim_index.count_and(['b', 'd']) == 0
+    assert spim_index.count_and(['a', 'b', 'c']) == 0
+
+
 def test_spim_clear(spim_index):
     assert spim_index.raw_data == {}
     assert spim_index.data == {}
