@@ -335,24 +335,30 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
         if mb_val < ma_val:
             mb1 = mb + 1
-            if ma - left_a <= mb1 - left_b:
-                self.double_binary_search(a, left_a, ma, pos_b, left_b, mb1, result)
-            else:
-                self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb1, result)
-            if right_a - ma - 1 <= right_b - mb1:
-                self.double_binary_search(a, ma + 1, right_a, pos_b, mb1, right_b, result)
-            else:
-                self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb1, right_b, result)
+            self.double_binary_search(a, left_a, ma, pos_b, left_b, mb1, result)
+            # According to the bench mark results, the follwoing branches were slower.
+            #
+            # if ma - left_a <= mb1 - left_b:
+            #     self.double_binary_search(a, left_a, ma, pos_b, left_b, mb1, result)
+            # else:
+            #     self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb1, result)
+            self.double_binary_search(a, ma + 1, right_a, pos_b, mb1, right_b, result)
+            # if right_a - ma - 1 <= right_b - mb1:
+            #     self.double_binary_search(a, ma + 1, right_a, pos_b, mb1, right_b, result)
+            # else:
+            #     self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb1, right_b, result)
         else:  # mb_val == ma_val
-            if ma - left_a <= mb - left_b:
-                self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            else:
-                self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb, result)
+            self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
+            # if ma - left_a <= mb - left_b:
+            #     self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
+            # else:
+            #     self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb, result)
             result.append(ma_val)
-            if right_a - ma <= right_b < mb:
-                self.double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-            else:
-                self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
+            self.double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
+            # if right_a - ma <= right_b < mb:
+            #     self.double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
+            # else:
+            #     self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
 
     def double_binary_search_b(self,
                                a: list[bytes], left_a: int, right_a: int,
