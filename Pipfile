@@ -6,8 +6,9 @@ name = "pypi"
 [packages]
 
 [dev-packages]
-pytest = "*"
 pylint = "*"
+pytest = "*"
+build = "*"
 
 [requires]
 python_version = "3.10"
