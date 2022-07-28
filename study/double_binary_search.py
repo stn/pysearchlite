@@ -1,20 +1,22 @@
+
+
 def binary_search(arr: list[int], target: int, left: int, right: int) -> int:
-    while left < right:
-        m = (left + right) // 2
+    original_right = right
+    while left != right:
+        lr = left + right
+        m = (lr // 2)
         if arr[m] < target:
             left = m + 1
         else:
             right = m
-    return left
+    if right < original_right and arr[right] < target:
+        return right + 1
+    return right
 
 
-def binary_search_rightmost(arr: list[int], target: int, left: int, right: int) -> int:
-    return binary_search(arr, target + 1, left, right) - 1
-
-
-def intersect_by_double_binary_search(a: list[int], left_a: int, right_a: int,
-                                      b: list[int], left_b: int, right_b: int,
-                                      result: list[int]):
+def double_binary_search(a: list[int], left_a: int, right_a: int,
+                         b: list[int], left_b: int, right_b: int,
+                         result: list[int]):
     if left_a >= right_a or left_b >= right_b:
         return
 
@@ -28,8 +30,8 @@ def intersect_by_double_binary_search(a: list[int], left_a: int, right_a: int,
                 result.append(ma_val)
             return
 
-        mb = binary_search(b, ma_val + 1, left_b, right_b) - 1
-        if mb < left_b:
+        mb = binary_search(b, ma_val, left_b, right_b)
+        if mb >= right_b:
             return
         if b[mb] == ma_val:
             result.append(ma_val)
@@ -37,30 +39,30 @@ def intersect_by_double_binary_search(a: list[int], left_a: int, right_a: int,
 
     ma = (left_a + right_a) // 2
     ma_val = a[ma]
-    mb = binary_search(b, ma_val + 1, left_b, right_b) - 1
-    if mb < left_b:
-        intersect_by_double_binary_search(a, ma + 1, right_a, b, left_b, right_b, result)
+    mb = binary_search(b, ma_val, left_b, right_b)
+    if mb >= right_b:
+        double_binary_search(a, left_a, ma, b, left_b, right_b, result)
         return
 
-    if b[mb] < ma_val:
-        if ma - left_a <= mb + 1 - left_b:
-            intersect_by_double_binary_search(a, left_a, ma, b, left_b, mb + 1, result)
+    if b[mb] > ma_val:
+        if ma - left_a <= mb - left_b:
+            double_binary_search(a, left_a, ma, b, left_b, mb, result)
         else:
-            intersect_by_double_binary_search(b, left_b, mb + 1, a, left_a, ma, result)
+            double_binary_search(b, left_b, mb, a, left_a, ma, result)
         if right_a - ma <= right_b - mb:
-            intersect_by_double_binary_search(a, ma + 1, right_a, b, mb + 1, right_b, result)
+            double_binary_search(a, ma + 1, right_a, b, mb, right_b, result)
         else:
-            intersect_by_double_binary_search(b, mb + 1, right_b, a, ma + 1, right_a, result)
-    elif b[mb] > ma_val:
+            double_binary_search(b, mb, right_b, a, ma + 1, right_a, result)
+    elif b[mb] < ma_val:
         assert False  # never happens
     else:  # mb_val == ma_val
         assert b[mb] == ma_val
         if ma - left_a <= mb - left_b:
-            intersect_by_double_binary_search(a, left_a, ma, b, left_b, mb, result)
+            double_binary_search(a, left_a, ma, b, left_b, mb, result)
         else:
-            intersect_by_double_binary_search(b, left_b, mb, a, left_a, ma, result)
+            double_binary_search(b, left_b, mb, a, left_a, ma, result)
         result.append(ma_val)
-        if right_a - ma - 1 <= right_b - mb - 1:
-            intersect_by_double_binary_search(a, ma + 1, right_a, b, mb + 1, right_b, result)
+        if right_a - ma <= right_b - mb:
+            double_binary_search(a, ma + 1, right_a, b, mb + 1, right_b, result)
         else:
-            intersect_by_double_binary_search(b, mb + 1, right_b, a, ma + 1, right_a, result)
+            double_binary_search(b, mb + 1, right_b, a, ma + 1, right_a, result)
