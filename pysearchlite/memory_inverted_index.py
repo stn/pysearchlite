@@ -5,7 +5,7 @@ class MemoryInvertedIndex(InvertedIndex):
 
     def __init__(self, idx_dir: str):
         super().__init__(idx_dir)
-        self.data: dict[str, list[int]] = dict()
+        self.data: dict[str, list[int]] = {}
 
     def add(self, idx: int, tokens: list[str]):
         for token in set(tokens):
@@ -33,7 +33,7 @@ class MemoryInvertedIndex(InvertedIndex):
                 f.write('\n')
 
     def restore(self):
-        self.data = dict()
+        self.data = {}
         with open(self.get_inverted_index_filename(), 'r', encoding='utf-8') as f:
             for line in f:
                 key_value = line[:-1].split('\t', maxsplit=1)
@@ -42,4 +42,4 @@ class MemoryInvertedIndex(InvertedIndex):
                 self.data[key] = pos
 
     def clear(self):
-        self.data = dict()
+        self.data = {}

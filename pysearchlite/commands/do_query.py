@@ -18,7 +18,7 @@ def main(idx_dir):
         elif command == 'TOP_10_COUNT':
             count = len(psl.search(query))
         else:
-            sys.stderr.print("UNSUPPORTED")
+            sys.stderr.write("UNSUPPORTED\n")
             count = 0
         sys.stdout.write(str(count) + '\n')
         sys.stdout.flush()

@@ -13,13 +13,37 @@ DOCID_LEN_BYTES = 4
 BYTEORDER: Literal["big", "little"] = "big"
 B_INT32_0 = b"\x00\x00\x00\x00"
 
+POS_SIZE = 10
+TOKEN_SIZE = 20
+
+
+def write_token(f: BinaryIO, token: str):
+    encoded_token = token.encode('utf-8')
+    # TODO: check overflow
+    f.write(len(encoded_token).to_bytes(TOKEN_LEN_BYTES, BYTEORDER))
+    f.write(encoded_token)
+
+
+def read_token(f: Union[BinaryIO, mmap.mmap]) -> str:
+    token_bytes = f.read(TOKEN_LEN_BYTES)
+    if not token_bytes:
+        return ""
+    token_len = int.from_bytes(token_bytes, BYTEORDER)
+    return f.read(token_len).decode('utf-8')
+
+
+def write_doc_ids(f: BinaryIO, doc_ids: list[int]):
+    f.write(len(doc_ids).to_bytes(DOCID_LEN_BYTES, BYTEORDER))
+    for doc_id in doc_ids:
+        f.write(doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
+
 
 class SinglePassInMemoryInvertedIndex(InvertedIndex):
 
     def __init__(self, idx_dir: str, mem_limit=1000_000_000):
         super().__init__(idx_dir)
-        self.raw_data: dict[str, list[int]] = dict()
-        self.data: dict[str, int] = dict()
+        self.raw_data: dict[str, list[int]] = {}
+        self.data: dict[str, int] = {}
         self.file: Optional[TextIO] = None
         self.mmap: Optional[mmap.mmap] = None
         self.tmp_index_num = 0
@@ -33,9 +57,6 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             self.file.close()
 
     def add(self, idx: int, tokens: list[str]):
-        POS_SIZE = 10
-        TOKEN_SIZE = 20
-
         for token in set(tokens):
             if token in self.raw_data:
                 self.raw_data[token].append(idx)
@@ -49,32 +70,14 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
     def tmp_index_name(self, i: int) -> str:
         return os.path.join(self.tmp_dir.name, f"{i}")
 
-    def write_token(self, f: BinaryIO, token: str):
-        encoded_token = token.encode('utf-8')
-        # TODO: check overflow
-        f.write(len(encoded_token).to_bytes(TOKEN_LEN_BYTES, BYTEORDER))
-        f.write(encoded_token)
-
-    def read_token(self, f: Union[BinaryIO, mmap.mmap]) -> str:
-        token_bytes = f.read(TOKEN_LEN_BYTES)
-        if not token_bytes:
-            return ""
-        token_len = int.from_bytes(token_bytes, BYTEORDER)
-        return f.read(token_len).decode('utf-8')
-
-    def write_doc_ids(self, f: BinaryIO, doc_ids: list[int]):
-        f.write(len(doc_ids).to_bytes(DOCID_LEN_BYTES, BYTEORDER))
-        for doc_id in doc_ids:
-            f.write(doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
-
     def save_raw_data(self):
         # [len(token)] [token] [len(ids)] [ids]
         with open(self.tmp_index_name(self.tmp_index_num), 'wb') as f:
             for token in sorted(self.raw_data.keys()):  # TODO this consumes a lot of memory
-                self.write_token(f, token)
+                write_token(f, token)
                 doc_ids = self.raw_data[token]
-                self.write_doc_ids(f, doc_ids)
-        self.raw_data = dict()
+                write_doc_ids(f, doc_ids)
+        self.raw_data = {}
         self.raw_data_size = 0
         self.tmp_index_num += 1
 
@@ -100,34 +103,34 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                 merged_index_name = self.tmp_index_name(self.tmp_index_num)
                 self.tmp_index_num += 1
                 with open(merged_index_name, 'wb') as out:
-                    token1 = self.read_token(f1)
-                    token2 = self.read_token(f2)
+                    token1 = read_token(f1)
+                    token2 = read_token(f2)
                     while True:
                         if not token1:
                             while token2:
-                                self.write_token(out, token2)
+                                write_token(out, token2)
                                 copy_ids(out, f2)
-                                token2 = self.read_token(f2)
+                                token2 = read_token(f2)
                             break
                         if not token2:
                             while token1:
-                                self.write_token(out, token1)
+                                write_token(out, token1)
                                 copy_ids(out, f1)
-                                token1 = self.read_token(f1)
+                                token1 = read_token(f1)
                             break
                         if token1 < token2:
-                            self.write_token(out, token1)
+                            write_token(out, token1)
                             copy_ids(out, f1)
-                            token1 = self.read_token(f1)
+                            token1 = read_token(f1)
                         elif token1 > token2:
-                            self.write_token(out, token2)
+                            write_token(out, token2)
                             copy_ids(out, f2)
-                            token2 = self.read_token(f2)
+                            token2 = read_token(f2)
                         else:
-                            self.write_token(out, token1)
+                            write_token(out, token1)
                             merge_ids(out, f1, f2)
-                            token1 = self.read_token(f1)
-                            token2 = self.read_token(f2)
+                            token1 = read_token(f1)
+                            token2 = read_token(f2)
         os.remove(idx1)
         os.remove(idx2)
         return merged_index_name
@@ -152,16 +155,16 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         os.remove(tmp_index_f[0])
 
     def restore(self):
-        self.data = dict()
+        self.data = {}
         self.file = open(self.get_inverted_index_filename(), 'rb')
         self.mmap = mmap.mmap(self.file.fileno(), length=0, access=mmap.ACCESS_READ)
-        token = self.read_token(self.mmap)
+        token = read_token(self.mmap)
         while token:
             pos = self.mmap.tell()
             self.data[token] = pos
             ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), BYTEORDER)
             self.mmap.seek(ids_len * DOCID_BYTES, 1)
-            token = self.read_token(self.mmap)
+            token = read_token(self.mmap)
 
     def get(self, token: str) -> list[int]:
         pos = self.data.get(token, -1)
@@ -387,5 +390,5 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         return len(doc_ids)
 
     def clear(self):
-        self.raw_data = dict()
-        self.data = dict()
+        self.raw_data = {}
+        self.data = {}

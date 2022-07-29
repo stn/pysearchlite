@@ -6,6 +6,9 @@ DOC_LIST_FILENAME = "doc_list"
 
 class DocList(abc.ABC):
 
+    def __init__(self, idx_dir: str):
+        self.idx_dir = idx_dir
+
     @abc.abstractmethod
     def add(self, name: str) -> int:
         pass
@@ -15,23 +18,26 @@ class DocList(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def save(self, idx_dir: str):
+    def save(self):
         pass
 
     @abc.abstractmethod
-    def restore(self, idx_dir: str):
+    def restore(self):
         pass
 
     @abc.abstractmethod
     def clear(self):
         pass
 
+    def get_doc_filename(self):
+        return os.path.join(self.idx_dir, DOC_LIST_FILENAME)
+
 
 class MemoryDocList(DocList):
 
     def __init__(self, idx_dir: str):
-        self.idx_dir = idx_dir
-        self.doc_list: list[str] = list()
+        super().__init__(idx_dir)
+        self.doc_list: list[str] = []
 
     def add(self, name: str) -> int:
         idx = len(self.doc_list)
@@ -42,16 +48,16 @@ class MemoryDocList(DocList):
         return self.doc_list[idx]
 
     def save(self):
-        with open(os.path.join(self.idx_dir, DOC_LIST_FILENAME), 'w', encoding='utf-8') as f:
+        with open(self.get_doc_filename(), 'w', encoding='utf-8') as doc_f:
             for name in self.doc_list:
-                f.write(name)
-                f.write('\n')
+                doc_f.write(name)
+                doc_f.write('\n')
 
     def restore(self):
-        self.doc_list = list()
-        with open(os.path.join(self.idx_dir, DOC_LIST_FILENAME), 'r', encoding='utf-8') as f:
-            for line in f:
+        self.doc_list = []
+        with open(self.get_doc_filename(), 'r', encoding='utf-8') as doc_f:
+            for line in doc_f:
                 self.doc_list.append(line[:-1])
 
     def clear(self):
-        self.doc_list = list()
+        self.doc_list = []

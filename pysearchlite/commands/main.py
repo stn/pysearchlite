@@ -8,8 +8,8 @@ def main():
     psl.init('idx')
     # Index
     for line in sys.stdin:
-        d = json.loads(line)
-        psl.index(d['id'], d['text'])
+        doc = json.loads(line)
+        psl.index(doc['id'], doc['text'])
     psl.save_index()
     psl.clear_index()
     psl.restore_index()

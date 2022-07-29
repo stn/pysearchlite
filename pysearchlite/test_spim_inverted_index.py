@@ -4,7 +4,12 @@ import tempfile
 
 import pytest
 
-from .spim_inveted_index import SinglePassInMemoryInvertedIndex
+from .spim_inveted_index import (
+    SinglePassInMemoryInvertedIndex,
+    read_token,
+    write_token,
+    write_doc_ids
+)
 
 
 # Big endian
@@ -47,19 +52,19 @@ def test_spim_tmp_index_name(spim_index):
 
 def test_spim_write_token(spim_index):
     f = io.BytesIO()
-    spim_index.write_token(f, 'hello')
+    write_token(f, 'hello')
     assert f.getvalue() == B_INT16_5 + b'hello'
 
 
 def test_spim_read_token(spim_index):
     f = io.BytesIO(B_INT16_5 + b'world')
-    token = spim_index.read_token(f)
+    token = read_token(f)
     assert token == 'world'
 
 
 def test_write_doc_ids(spim_index):
     f = io.BytesIO()
-    spim_index.write_doc_ids(f, [1, 2, 5])
+    write_doc_ids(f, [1, 2, 5])
     assert f.getvalue() == B_INT32_3 + B_INT32_1 + B_INT32_2 + B_INT32_5
 
 
