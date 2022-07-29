@@ -1,11 +1,9 @@
 from typing import Optional
 
 from .doc_list import DocList, MemoryDocList
-from .inverted_index import (
-    InvertedIndex,
-    MemoryInvertedIndex,
-    SinglePassInMemoryInvertedIndex,
-)
+from .inverted_index import InvertedIndex
+from .memory_inverted_index import MemoryInvertedIndex
+from .spim_inveted_index import SinglePassInMemoryInvertedIndex
 from .tokenize import normalized_tokens
 
 

@@ -4,9 +4,8 @@ import tempfile
 
 import pytest
 
-from .inverted_index import (
-    SinglePassInMemoryInvertedIndex,
-)
+from .spim_inveted_index import SinglePassInMemoryInvertedIndex
+
 
 # Big endian
 B_INT16_1 = b'\x00\x01'
