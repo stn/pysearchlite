@@ -178,11 +178,6 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
             pos += DOCID_BYTES
         return ids
 
-    def next_doc_id(self, pos: int) -> (bytes, int):
-        npos = pos + DOCID_BYTES
-        doc_id = self.mmap[pos:npos]
-        return doc_id, npos
-
     def prepare_state(self, tokens: list[str]) -> list[(int, int)]:
         # confirm if all tokens are in index.
         file_pos = []
