@@ -244,58 +244,6 @@ class SinglePassInMemoryInvertedIndexMemory(InvertedIndex):
             # else:
             #     self.double_binary_search_b(a, ma + 1, right_a, b, mb + 1, right_b, result)
 
-    def double_binary_search_b(self,
-                               a: list[int], left_a: int, right_a: int,
-                               b: list[int], left_b: int, right_b: int,
-                               result: list[int]):
-        if left_a >= right_a or left_b >= right_b:
-            return
-
-        if right_b - left_b == 1:
-            mb_val = b[left_b]
-            if right_a - left_a == 1:
-                ma_val = a[left_a]
-                if mb_val == ma_val:
-                    result.append(mb_val)
-                return
-
-            ma = self.binary_search(a, mb_val, left_a, right_a)
-            if ma >= right_a:
-                return
-            ma_val = a[ma]
-            if ma_val == mb_val:
-                result.append(mb_val)
-            return
-
-        mb = (left_b + right_b) // 2
-        mb_val = b[mb]
-        ma = self.binary_search(a, mb_val, left_a, right_a)
-        if ma >= right_a:
-            self.double_binary_search_b(a, left_a, right_a, b, left_b, mb, result)
-            return
-
-        mb_val = b[mb]
-        ma_val = a[ma]
-        if ma_val > mb_val:
-            if ma - left_a >= mb - left_b:
-                self.double_binary_search(a, left_a, ma, b, left_b, mb, result)
-            else:
-                self.double_binary_search(a, left_a, ma, b, left_b, mb, result)
-            if right_a - ma - 1 >= right_b - mb:
-                self.double_binary_search(a, ma + 1, right_a, b, mb, right_b, result)
-            else:
-                self.double_binary_search(a, ma + 1, right_a, b, mb, right_b, result)
-        else:  # ma_val == mb_val
-            if ma - left_a >= mb - left_b:
-                self.double_binary_search(a, left_a, ma, b, left_b, mb, result)
-            else:
-                self.double_binary_search(a, left_a, ma, b, left_b, mb, result)
-            result.append(ma_val)
-            if right_a - ma >= right_b - mb:
-                self.double_binary_search(a, ma + 1, right_a, b, mb + 1, right_b, result)
-            else:
-                self.double_binary_search(a, ma + 1, right_a, b, mb + 1, right_b, result)
-
     def search_and(self, tokens: list[str]) -> list[int]:
         if len(tokens) == 1:
             return self.get(tokens[0])
