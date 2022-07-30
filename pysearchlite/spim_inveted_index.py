@@ -160,18 +160,16 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         self.mmap = mmap.mmap(self.file.fileno(), length=0, access=mmap.ACCESS_READ)
         token = read_token(self.mmap)
         while token:
-            pos = self.mmap.tell()
-            self.data[token] = pos
             ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), BYTEORDER)
+            pos = self.mmap.tell()
+            self.data[token] = (ids_len, pos)
             self.mmap.seek(ids_len * DOCID_BYTES, 1)
             token = read_token(self.mmap)
 
     def get(self, token: str) -> list[int]:
-        pos = self.data.get(token, -1)
-        if pos < 0:
+        ids_len, pos = self.data.get(token, (0, -1))
+        if ids_len == 0:
             return []
-        ids_len = int.from_bytes(self.mmap[pos:pos + DOCID_LEN_BYTES], BYTEORDER)
-        pos += DOCID_LEN_BYTES
         ids = []
         for _ in range(ids_len):
             ids.append(int.from_bytes(self.mmap[pos:pos + DOCID_BYTES], BYTEORDER))
@@ -180,18 +178,12 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
 
     def prepare_state(self, tokens: list[str]) -> list[(int, int)]:
         # confirm if all tokens are in index.
-        file_pos = []
-        for t in tokens:
-            pos = self.data.get(t, -1)
-            if pos < 0:
-                return []
-            file_pos.append(pos)
-        # state: a list of (n, file position)
         state = []
-        for pos in file_pos:
-            npos = pos + DOCID_LEN_BYTES
-            doc_ids_len = int.from_bytes(self.mmap[pos:npos], BYTEORDER)
-            state.append((doc_ids_len, npos))
+        for t in tokens:
+            l, pos = self.data.get(t, (0, -1))
+            if l == 0:
+                return []
+            state.append((l, pos))
         state.sort(key=itemgetter(0))
         return state
 
@@ -353,10 +345,7 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
 
     def count_and(self, tokens: list[str]) -> int:
         if len(tokens) == 1:
-            pos = self.data.get(tokens[0], -1)
-            if pos < 0:
-                return 0
-            ids_len = int.from_bytes(self.mmap[pos:pos + DOCID_LEN_BYTES], BYTEORDER)
+            ids_len, _ = self.data.get(tokens[0], (0, -1))
             return ids_len
 
         state = self.prepare_state(tokens)

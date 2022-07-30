@@ -99,7 +99,7 @@ def test_spim_restore(spim_index):
                 B_INT16_1 + b'b' + B_INT32_1 + B_INT32_0 +
                 B_INT16_1 + b'c' + B_INT32_2 + B_INT32_0 + B_INT32_1)
     spim_index.restore()
-    assert spim_index.data == {'a': 2+1, 'b': (2+1+4+4)+2+1, 'c': (2+1+4+4)*2+2+1}
+    assert spim_index.data == {'a': (1, 2+1+4), 'b': (1, (2+1+4+4)+2+1+4), 'c': (2, (2+1+4+4)*2+2+1+4)}
 
 
 def test_spim_get(spim_index):
