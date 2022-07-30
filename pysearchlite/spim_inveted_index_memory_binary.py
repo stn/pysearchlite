@@ -1,5 +1,6 @@
 import os
 import shutil
+from bisect import bisect_left
 from operator import itemgetter
 from typing import Optional, TextIO, BinaryIO, Union, Literal
 
@@ -208,7 +209,8 @@ class SinglePassInMemoryInvertedIndexMemoryBinary(InvertedIndex):
                     result.append(ma_val)
                 return
 
-            mb = self.binary_search(b, ma_val, left_b, right_b)
+            #mb = self.binary_search(b, ma_val, left_b, right_b)
+            mb = bisect_left(b, ma_val, lo=left_b, hi=right_b)
             if mb >= right_b:
                 return
             mb_val = b[mb]
@@ -218,7 +220,8 @@ class SinglePassInMemoryInvertedIndexMemoryBinary(InvertedIndex):
 
         ma = (left_a + right_a) // 2
         ma_val = a[ma]
-        mb = self.binary_search(b, ma_val, left_b, right_b)
+        #mb = self.binary_search(b, ma_val, left_b, right_b)
+        mb = bisect_left(b, ma_val, lo=left_b, hi=right_b)
         if mb >= right_b:
             self.double_binary_search(a, left_a, ma, b, left_b, right_b, result)
             return
