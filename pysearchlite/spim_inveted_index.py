@@ -206,6 +206,50 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
                 right = m
         return left
 
+    def double_binary_search_pos(self,
+                                 pos_a: int, left_a: int, right_a: int,
+                                 pos_b: int, left_b: int, right_b: int,
+                                 result: list[bytes]):
+        if left_a >= right_a or left_b >= right_b:
+            return
+
+        if right_a - left_a == 1:
+            ma_pos = pos_a + left_a * DOCID_BYTES
+            ma_val = self.mmap[ma_pos:ma_pos + DOCID_BYTES]
+            if right_b - left_b == 1:
+                mb_pos = pos_b + left_b * DOCID_BYTES
+                mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
+                if mb_val == ma_val:
+                    result.append(ma_val)
+                return
+
+            mb = self.binary_search(pos_b, ma_val, left_b, right_b)
+            if mb >= right_b:
+                return
+            mb_pos = pos_b + mb * DOCID_BYTES
+            mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
+            if mb_val == ma_val:
+                result.append(ma_val)
+            return
+
+        ma = (left_a + right_a) // 2
+        ma_pos = pos_a + ma * DOCID_BYTES
+        ma_val = self.mmap[ma_pos:ma_pos + DOCID_BYTES]
+        mb = self.binary_search(pos_b, ma_val, left_b, right_b)
+        if mb >= right_b:
+            self.double_binary_search_pos(pos_a, left_a, ma, pos_b, left_b, right_b, result)
+            return
+
+        mb_pos = pos_b + mb * DOCID_BYTES
+        mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
+        if mb_val > ma_val:
+            self.double_binary_search_pos(pos_a, left_a, ma, pos_b, left_b, mb, result)
+            self.double_binary_search_pos(pos_a, ma + 1, right_a, pos_b, mb, right_b, result)
+        else:  # mb_val == ma_val
+            self.double_binary_search_pos(pos_a, left_a, ma, pos_b, left_b, mb, result)
+            result.append(ma_val)
+            self.double_binary_search_pos(pos_a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
+
     def double_binary_search(self,
                              a: list[bytes], left_a: int, right_a: int,
                              pos_b: int, left_b: int, right_b: int,
@@ -329,15 +373,13 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         if not state:
             return []
 
-        # set the initial doc ids from the first doc id list.
-        doc_ids = []
-        n, pos = state[0]
-        for _ in range(n):
-            doc_ids.append(self.mmap[pos:pos + DOCID_BYTES])
-            pos += DOCID_BYTES
-
-        # find common doc ids
-        for i, (n_b, pos_b) in enumerate(state[1:]):
+        result = []
+        n_a, pos_a = state[0]
+        n_b, pos_b = state[1]  # since len(tokens) >= 2
+        self.double_binary_search_pos(pos_a, 0, n_a, pos_b, 0, n_b, result)
+        doc_ids = result
+        # when len(tokens) >= 3
+        for i, (n_b, pos_b) in enumerate(state[2:]):
             result = []
             self.double_binary_search(doc_ids, 0, len(doc_ids), pos_b, 0, n_b, result)
             doc_ids = result
@@ -352,14 +394,13 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         if not state:
             return 0
 
-        # set the initial doc ids from the first doc id list.
-        doc_ids = []
-        n, pos = state[0]
-        for _ in range(n):
-            doc_ids.append(self.mmap[pos:pos + DOCID_BYTES])
-            pos += DOCID_BYTES
-        # find common doc ids
-        for i, (n_b, pos_b) in enumerate(state[1:]):
+        result = []
+        n_a, pos_a = state[0]
+        n_b, pos_b = state[1]  # since len(tokens) >= 2
+        self.double_binary_search_pos(pos_a, 0, n_a, pos_b, 0, n_b, result)
+        doc_ids = result
+        # when len(tokens) >= 3
+        for i, (n_b, pos_b) in enumerate(state[2:]):
             result = []
             self.double_binary_search(doc_ids, 0, len(doc_ids), pos_b, 0, n_b, result)
             doc_ids = result
