@@ -1,17 +1,14 @@
 
 
 def binary_search(arr: list[int], target: int, left: int, right: int) -> int:
-    original_right = right
-    while left != right:
+    while left < right:
         lr = left + right
         m = (lr // 2)
         if arr[m] < target:
             left = m + 1
         else:
             right = m
-    if right < original_right and arr[right] < target:
-        return right + 1
-    return right
+    return left
 
 
 def double_binary_search(a: list[int], left_a: int, right_a: int,

@@ -183,16 +183,13 @@ class SinglePassInMemoryInvertedIndexMemoryBinary(InvertedIndex):
         return state
 
     def binary_search(self, a: list[bytes], doc_id: bytes, left: int, right: int) -> int:
-        original_right = right
-        while left != right:
+        while left < right:
             m = (left + right) // 2
             if a[m] < doc_id:
                 left = m + 1
             else:
                 right = m
-        if right < original_right and a[right] < doc_id:
-            return right + 1
-        return right
+        return left
 
     def double_binary_search(self,
                              a: list[bytes], left_a: int, right_a: int,
@@ -209,8 +206,7 @@ class SinglePassInMemoryInvertedIndexMemoryBinary(InvertedIndex):
                     result.append(ma_val)
                 return
 
-            #mb = self.binary_search(b, ma_val, left_b, right_b)
-            mb = bisect_left(b, ma_val, lo=left_b, hi=right_b)
+            mb = self.binary_search(b, ma_val, left_b, right_b)
             if mb >= right_b:
                 return
             mb_val = b[mb]
@@ -220,8 +216,7 @@ class SinglePassInMemoryInvertedIndexMemoryBinary(InvertedIndex):
 
         ma = (left_a + right_a) // 2
         ma_val = a[ma]
-        #mb = self.binary_search(b, ma_val, left_b, right_b)
-        mb = bisect_left(b, ma_val, lo=left_b, hi=right_b)
+        mb = self.binary_search(b, ma_val, left_b, right_b)
         if mb >= right_b:
             self.double_binary_search(a, left_a, ma, b, left_b, right_b, result)
             return

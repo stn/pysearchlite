@@ -196,31 +196,23 @@ class SinglePassInMemoryInvertedIndex(InvertedIndex):
         return state
 
     def binary_search(self, pos: int, doc_id: bytes, left: int, right: int) -> int:
-        original_right = right
-        while left != right:
+        while left < right:
             m = (left + right) // 2
             m_pos = pos + m * DOCID_BYTES
             if self.mmap[m_pos:m_pos + DOCID_BYTES] < doc_id:
                 left = m + 1
             else:
                 right = m
-        if right < original_right:
-            r_pos = pos + right * DOCID_BYTES
-            if self.mmap[r_pos:r_pos + DOCID_BYTES] < doc_id:
-                return right + 1
-        return right
+        return left
 
     def binary_search_a(self, a: list[bytes], doc_id: bytes, left: int, right: int) -> int:
-        original_right = right
-        while left != right:
+        while left < right:
             m = (left + right) // 2
             if a[m] < doc_id:
                 left = m + 1
             else:
                 right = m
-        if right < original_right and a[right] < doc_id:
-            return right + 1
-        return right
+        return left
 
     def double_binary_search(self,
                              a: list[bytes], left_a: int, right_a: int,
