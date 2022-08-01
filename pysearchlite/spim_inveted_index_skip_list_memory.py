@@ -1,11 +1,11 @@
 import os
-import random
 import shutil
 from array import array
 from operator import itemgetter
-from typing import Optional, TextIO, BinaryIO, Union, Literal
+from typing import Optional, TextIO, BinaryIO, Literal
 
 from .inverted_index import InvertedIndex
+from .skip_list import SkipList
 
 TOKEN_LEN_BYTES = 2
 DOCID_BYTES = 4
@@ -16,8 +16,6 @@ B_INT32_0 = b"\x00\x00\x00\x00"
 
 POS_SIZE = 10
 TOKEN_SIZE = 20
-
-SKIP_LIST_P = 2
 
 
 def write_token(f: BinaryIO, token: str):
@@ -41,80 +39,12 @@ def write_doc_ids(f: BinaryIO, doc_ids: list[int]):
         f.write(doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
 
 
-def make_skip_list(ids: list[int]) -> list[array]:
-    last_pointer = []
-    skip_list = [array('i', [ids[0]])]
-    for i in range(1, len(ids)):
-        node = [ids[i]]
-        level = 0
-        while random.random() < (1.0 / SKIP_LIST_P):
-            node.append(-1)
-            if len(last_pointer) > level:
-                skip_list[last_pointer[level]][level + 1] = i
-                last_pointer[level] = i
-            else:
-                skip_list[0].append(i)
-                last_pointer.append(i)
-                break
-            level += 1
-        skip_list.append(array('i', node))
-    return skip_list
-
-
-def skip_list_search(b: list[array], doc_id_a: int, pos_b: int):
-    doc_id_b = -1
-    if len(b[0]) == 1:
-        # no skip list
-        for i in range(pos_b, len(b)):
-            doc_id_b = b[i][0]
-            if doc_id_b >= doc_id_a:
-                return doc_id_b, i
-        return doc_id_b, len(b)
-
-    pos_b = [pos_b] * len(b[0])
-    level = len(pos_b) - 1
-    while level > 0:
-        pos = pos_b[level]
-        next_pos = b[pos][level]
-        if next_pos >= 0 and b[next_pos][0] < doc_id_a:
-            pos_b[level] = next_pos
-        else:
-            level -= 1
-            pos_b[level] = pos
-    for i in range(pos, len(b)):
-        doc_id_b = b[i][0]
-        if doc_id_b >= doc_id_a:
-            return doc_id_b, pos_b[-1]
-    return doc_id_b, pos_b[-1]
-
-
-def skip_list_and(a: list[array], b: list[array]) -> array:
-    result = array('i')
-    pos_b = 0
-    for node in a:
-        doc_id_a = node[0]
-        doc_id_b, pos_b = skip_list_search(b, doc_id_a, pos_b)
-        if doc_id_b == doc_id_a:
-            result.append(doc_id_a)
-    return result
-
-
-def doc_ids_and_skip_list(a: array, b: list[array]) -> array:
-    result = array('i')
-    pos_b = 0
-    for doc_id_a in a:
-        doc_id_b, pos_b = skip_list_search(b, doc_id_a, pos_b)
-        if doc_id_b == doc_id_a:
-            result.append(doc_id_a)
-    return result
-
-
 class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
 
     def __init__(self, idx_dir: str, mem_limit=1000_000_000):
         super().__init__(idx_dir)
         self.raw_data: dict[str, list[int]] = {}
-        self.data: dict[str, list[array]] = {}
+        self.data: dict[str, SkipList] = {}
         self.file: Optional[TextIO] = None
         self.tmp_index_num = 0
         self.raw_data_size = 0
@@ -231,7 +161,7 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
             ids = []
             for i in range(ids_len):
                 ids.append(int.from_bytes(self.file.read(DOCID_BYTES), BYTEORDER))
-            skip_list = make_skip_list(ids)
+            skip_list = SkipList.from_list(ids)
             self.data[token] = (ids_len, skip_list)
             token = read_token(self.file)
 
@@ -239,7 +169,7 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
         n, skip_list = self.data.get(token, (0, []))
         if n == 0:
             return []
-        return [node[0] for node in skip_list]
+        return skip_list.get_ids()
 
     def prepare_state(self, tokens: list[str]) -> list[(int, list[array])]:
         state = []
@@ -261,10 +191,10 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
 
         _, skip_list_a = state[0]
         _, skip_list_b = state[1]
-        doc_ids_a = skip_list_and(skip_list_a, skip_list_b)
+        doc_ids_a = skip_list_a.intersection(skip_list_b)
         # find common doc ids
         for i, (n_b, skip_list_b) in enumerate(state[2:]):
-            doc_ids_a = doc_ids_and_skip_list(doc_ids_a, skip_list_b)
+            doc_ids_a = skip_list_b.intersection_with_doc_ids(doc_ids_a)
         return doc_ids_a.tolist()
 
     def count_and(self, tokens: list[str]) -> int:
@@ -278,10 +208,10 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
 
         _, skip_list_a = state[0]
         _, skip_list_b = state[1]
-        doc_ids_a = skip_list_and(skip_list_a, skip_list_b)
+        doc_ids_a = skip_list_a.intersection(skip_list_b)
         # find common doc ids
         for _, skip_list_b in state[2:]:
-            doc_ids_a = doc_ids_and_skip_list(doc_ids_a, skip_list_b)
+            doc_ids_a = skip_list_b.intersection_with_doc_ids(doc_ids_a)
         return len(doc_ids_a)
 
     def clear(self):
