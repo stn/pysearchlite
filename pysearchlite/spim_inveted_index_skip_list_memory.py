@@ -63,13 +63,29 @@ def make_skip_list(ids: list[int]) -> list[array]:
 
 def skip_list_search(b: list[array], doc_id_a: int, pos_b: int):
     doc_id_b = -1
-    while pos_b < len(b):
-        doc_id_b = b[pos_b][0]
-        if doc_id_b < doc_id_a:
-            pos_b += 1
+    if len(b[0]) == 1:
+        # no skip list
+        for i in range(pos_b, len(b)):
+            doc_id_b = b[i][0]
+            if doc_id_b >= doc_id_a:
+                return doc_id_b, i
+        return doc_id_b, len(b)
+
+    pos_b = [pos_b] * len(b[0])
+    level = len(pos_b) - 1
+    while level > 0:
+        pos = pos_b[level]
+        next_pos = b[pos][level]
+        if next_pos >= 0 and b[next_pos][0] < doc_id_a:
+            pos_b[level] = next_pos
         else:
-            break
-    return doc_id_b, pos_b
+            level -= 1
+            pos_b[level] = pos
+    for i in range(pos, len(b)):
+        doc_id_b = b[i][0]
+        if doc_id_b >= doc_id_a:
+            return doc_id_b, pos_b[-1]
+    return doc_id_b, pos_b[-1]
 
 
 def skip_list_and(a: list[array], b: list[array]) -> array:
