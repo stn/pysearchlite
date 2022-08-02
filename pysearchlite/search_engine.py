@@ -5,7 +5,7 @@ from .inverted_index import InvertedIndex
 # from .memory_inverted_index import MemoryInvertedIndex
 # from .spim_inveted_index import SinglePassInMemoryInvertedIndex
 # from .spim_inveted_index_memory import SinglePassInMemoryInvertedIndexMemory
-from .spim_inveted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
+from .spim_inverted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
 # from .spim_inveted_index_memory_binary import SinglePassInMemoryInvertedIndexMemoryBinary
 from .tokenize import normalized_tokens
 

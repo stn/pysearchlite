@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from .spim_inveted_index_skip_list_memory import (
+from .spim_inverted_index_skip_list_memory import (
     SinglePassInMemoryInvertedIndexSkipListMemory,
     read_token,
     write_token,

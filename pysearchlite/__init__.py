@@ -14,9 +14,10 @@ from .doc_list import (
 )
 from .inverted_index import InvertedIndex
 from .memory_inverted_index import MemoryInvertedIndex
-from .spim_inveted_index import SinglePassInMemoryInvertedIndex
-from .spim_inveted_index_memory import SinglePassInMemoryInvertedIndexMemory
-from .spim_inveted_index_memory_binary import SinglePassInMemoryInvertedIndexMemoryBinary
+from .spim_inverted_index import SinglePassInMemoryInvertedIndex
+from .spim_inverted_index_memory import SinglePassInMemoryInvertedIndexMemory
+from .spim_inverted_index_memory_binary import SinglePassInMemoryInvertedIndexMemoryBinary
+from .spim_inverted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
 
 
 VERSION = '0.4.11'
