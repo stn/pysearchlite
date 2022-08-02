@@ -3,8 +3,9 @@ from typing import Optional
 from .doc_list import DocList, MemoryDocList
 from .inverted_index import InvertedIndex
 # from .memory_inverted_index import MemoryInvertedIndex
-from .spim_inveted_index import SinglePassInMemoryInvertedIndex
+# from .spim_inveted_index import SinglePassInMemoryInvertedIndex
 # from .spim_inveted_index_memory import SinglePassInMemoryInvertedIndexMemory
+from .spim_inveted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
 # from .spim_inveted_index_memory_binary import SinglePassInMemoryInvertedIndexMemoryBinary
 from .tokenize import normalized_tokens
 
@@ -16,7 +17,7 @@ INVERTED_INDEX: Optional[InvertedIndex] = None
 def init(idx_dir: str):
     global DOC_LIST, INVERTED_INDEX
     DOC_LIST = MemoryDocList(idx_dir)
-    INVERTED_INDEX = SinglePassInMemoryInvertedIndex(idx_dir)
+    INVERTED_INDEX = SinglePassInMemoryInvertedIndexSkipListMemory(idx_dir)
 
 
 def index(name: str, text: str):
