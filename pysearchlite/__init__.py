@@ -19,4 +19,4 @@ from .spim_inveted_index_memory import SinglePassInMemoryInvertedIndexMemory
 from .spim_inveted_index_memory_binary import SinglePassInMemoryInvertedIndexMemoryBinary
 
 
-VERSION = '0.4.10'
+VERSION = '0.4.11'
