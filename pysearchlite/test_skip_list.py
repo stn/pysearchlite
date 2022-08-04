@@ -1,3 +1,4 @@
+from array import array
 from random import randrange
 
 import pytest as pytest
@@ -22,6 +23,23 @@ def skip_list_search_test_cases(num, max_len):
         target = randrange(arr_len * 4)
         tests.append((arr, target))
     return tests
+
+
+def test_skip_list_fromlist():
+    p = 2
+    offset = 0
+    sl = SkipList.from_list([1], p=p, offset=offset)
+    assert sl.data == [array('i', [1])]
+    sl = SkipList.from_list([1, 2], p=p, offset=offset)
+    assert sl.data == [array('i', [1]), array('i', [2])]
+    sl = SkipList.from_list([1, 2, 3], p=p, offset=offset)
+    assert sl.data == [array('i', [1, 2]), array('i', [2]), array('i', [3, -1])]
+    sl = SkipList.from_list([1, 2, 3, 4], p=p, offset=offset)
+    assert sl.data == [array('i', [1, 2]), array('i', [2]), array('i', [3, -1]), array('i', [4])]
+    sl = SkipList.from_list([1, 2, 3, 4, 5], p=p, offset=offset)
+    assert sl.data == [array('i', [1, 2, 4]), array('i', [2]), array('i', [3, 4]), array('i', [4]), array('i', [5, -1, -1])]
+    sl = SkipList.from_list([1, 2, 3, 4, 5], p=p, offset=1)
+    assert sl.data == [array('i', [1, 2]), array('i', [2]), array('i', [3, 4]), array('i', [4]), array('i', [5, -1])]
 
 
 @pytest.mark.parametrize('arr, target', skip_list_search_test_cases(100, 10))

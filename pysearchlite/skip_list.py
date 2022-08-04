@@ -1,8 +1,10 @@
+import math
+import os
 from array import array
-import random
 
 
-SKIP_LIST_P = 2
+SKIPLIST_P = os.environ.get('PYSEARCHLITE_SKIPLIST_P', 4)
+OFFSET = os.environ.get('PYSEARCHLITE_SKIPLIST_OFFSET', 2)
 
 
 class SkipList(object):
@@ -11,13 +13,15 @@ class SkipList(object):
         self.data = None
 
     @staticmethod
-    def from_list(ids: list[int], p=SKIP_LIST_P):
+    def from_list(ids: list[int], p=SKIPLIST_P, offset=OFFSET):
+        max_height = math.log(max(len(ids) - 1, 1), p) - offset
         last_pointer = []
         skip_list = [array('i', [ids[0]])]
         for i in range(1, len(ids)):
             node = [ids[i]]
             level = 0
-            while random.random() < (1.0 / p):
+            m = p
+            while (i % m) == 0 and level < max_height:
                 node.append(-1)
                 if len(last_pointer) > level:
                     skip_list[last_pointer[level]][level + 1] = i
@@ -27,6 +31,7 @@ class SkipList(object):
                     last_pointer.append(i)
                     break
                 level += 1
+                m *= p
             skip_list.append(array('i', node))
         s = SkipList()
         s.data = skip_list
