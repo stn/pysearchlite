@@ -3,8 +3,8 @@ import os
 from array import array
 
 
-SKIPLIST_P = os.environ.get('PYSEARCHLITE_SKIPLIST_P', 4)
-OFFSET = os.environ.get('PYSEARCHLITE_SKIPLIST_OFFSET', 2)
+SKIPLIST_P = int(os.environ.get('PYSEARCHLITE_SKIPLIST_P', '4'))
+OFFSET = int(os.environ.get('PYSEARCHLITE_SKIPLIST_OFFSET', '2'))
 
 
 class SkipList(object):
