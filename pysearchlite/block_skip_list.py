@@ -1,5 +1,6 @@
 import math
 import os
+import sys
 from array import array
 
 
@@ -13,6 +14,8 @@ class BlockSkipList(object):
         self.p = SKIPLIST_P
         self.ids = None
         self.skip_lists = None
+        self.current_pos = None
+        self.last_id = None
 
     @staticmethod
     def from_list(ids: list[int], p=SKIPLIST_P, offset=OFFSET):
@@ -36,69 +39,71 @@ class BlockSkipList(object):
     def get_ids(self) -> list[int]:
         return self.ids.tolist()
 
-    def search(self, doc_id_a: int, pos_b: int = 0):
-        doc_id_b = -1
+    def search(self, doc_id_a: int):
         if len(self.skip_lists) == 0:
             # no skip list
-            for i in range(pos_b, len(self.ids)):
+            for i in range(self.current_pos[0], len(self.ids)):
                 if self.ids[i] >= doc_id_a:
-                    return self.ids[i], i
-            return self.ids[-1], len(self.ids)
+                    self.current_pos[0] = i
+                    return self.ids[i]
+            return self.ids[-1]
 
-        # top level
-        level = len(self.skip_lists) - 1
-        skip_list = self.skip_lists[level]
-        if skip_list[pos_b] >= doc_id_a:
-            return skip_list[pos_b], pos_b
-        next_pos = pos_b + 1
-        while next_pos < len(skip_list):
-            if skip_list[next_pos] < doc_id_a:
-                pos_b = next_pos
-                next_pos += 1
-            elif skip_list[next_pos] > doc_id_a:
-                break
-            else:  # ==
-                return doc_id_a, pos_b
+        # Check the start position.
+        level = len(self.skip_lists)
+        pos = self.current_pos[level]
 
-        # mid level
-        level -= 1
-        pos = pos_b
-        while level >= 0:
-            pos = pos * self.p
-            skip_list = self.skip_lists[level]
-            next_pos = pos + 1
-            while next_pos < len(skip_list):
-                if skip_list[next_pos] < doc_id_a:
-                    pos = next_pos
-                    next_pos += 1
-                elif skip_list[next_pos] > doc_id_a:
+        # When the first item is greater than the given doc id.
+        if self.ids[pos] >= doc_id_a:
+            return self.ids[0]
+
+        # skip list
+        while level > 0:
+            skip_list = self.skip_lists[level - 1]
+            while True:
+                pos_id = skip_list[pos]
+                if pos_id < doc_id_a:
+                    pos += 1
+                    if pos >= len(skip_list):
+                        self.current_pos[level] = pos - 1
+                        self.last_id[level] = pos_id
+                        break
+                elif pos_id > doc_id_a:
+                    self.current_pos[level] = pos - 1  # 最初の要素がこうならないようにガードが必要
+                    self.last_id[level] = pos_id
                     break
-                else:
-                    return doc_id_a, pos_b
+                else:  # pos_id == doc_id_a:
+                    self.current_pos[level] = pos
+                    self.last_id[level] = pos_id
+                    return pos_id
+            pos = pos * self.p
             level -= 1
 
         # ids
-        pos = pos * self.p
         for i in range(pos, len(self.ids)):
-            doc_id_b = self.ids[i]
-            if doc_id_b >= doc_id_a:
-                return doc_id_b, pos_b
-        return doc_id_b, pos_b
+            pos_id = self.ids[i]
+            if pos_id >= doc_id_a:
+                self.current_pos[0] = pos_id
+                return pos_id
+        return pos_id
 
     def intersection(self, b) -> array:
+        b.reset()
         result = array('i')
-        pos_b = 0
         for doc_id_a in self.ids:
-            doc_id_b, pos_b = b.search(doc_id_a, pos_b)
+            doc_id_b = b.search(doc_id_a)
             if doc_id_b == doc_id_a:
                 result.append(doc_id_a)
         return result
 
     def intersection_with_doc_ids(self, a: array) -> array:
+        self.reset()
         result = array('i')
-        pos_b = 0
         for doc_id_a in a:
-            doc_id_b, pos_b = self.search(doc_id_a, pos_b)
+            doc_id_b = self.search(doc_id_a)
             if doc_id_b == doc_id_a:
                 result.append(doc_id_a)
         return result
+
+    def reset(self):
+        self.current_pos = [0] * (len(self.skip_lists) + 1)
+        self.last_id = [0] * len(self.skip_lists)

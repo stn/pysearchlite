@@ -45,7 +45,8 @@ def test_block_skip_list_fromlist():
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
 def test_block_skip_list_search(arr, target):
     skip_list = BlockSkipList.from_list(arr)
-    ret, skip_list_pos = skip_list.search(target, 0)
+    skip_list.reset()
+    ret = skip_list.search(target)
     i = linear_search(arr, target)
     if i == len(arr):
         assert ret == arr[-1]
