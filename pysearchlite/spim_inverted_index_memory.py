@@ -43,14 +43,9 @@ class SinglePassInMemoryInvertedIndexMemory(InvertedIndex):
         super().__init__(idx_dir)
         self.raw_data: dict[str, list[int]] = {}
         self.data: dict[str, list[int]] = {}
-        self.file: Optional[TextIO] = None
         self.tmp_index_num = 0
         self.raw_data_size = 0
         self.mem_limit = mem_limit
-
-    def __del__(self):
-        if self.file:
-            self.file.close()
 
     def add(self, idx: int, tokens: list[str]):
         for token in set(tokens):
@@ -152,15 +147,15 @@ class SinglePassInMemoryInvertedIndexMemory(InvertedIndex):
 
     def restore(self):
         self.data = {}
-        self.file = open(self.get_inverted_index_filename(), 'rb')
-        token = read_token(self.file)
-        while token:
-            ids_len = int.from_bytes(self.file.read(DOCID_LEN_BYTES), BYTEORDER)
-            ids = []
-            for i in range(ids_len):
-                ids.append(int.from_bytes(self.file.read(DOCID_BYTES), BYTEORDER))
-            self.data[token] = ids
-            token = read_token(self.file)
+        with open(self.get_inverted_index_filename(), 'rb') as file:
+            token = read_token(file)
+            while token:
+                ids_len = int.from_bytes(file.read(DOCID_LEN_BYTES), BYTEORDER)
+                ids = []
+                for i in range(ids_len):
+                    ids.append(int.from_bytes(file.read(DOCID_BYTES), BYTEORDER))
+                self.data[token] = ids
+                token = read_token(file)
 
     def get(self, token: str) -> list[int]:
         return self.data.get(token, [])
