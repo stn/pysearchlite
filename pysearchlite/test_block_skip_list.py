@@ -29,17 +29,17 @@ def test_block_skip_list_fromlist():
     p = 2
     offset = 0
     sl = BlockSkipList.from_list([1], p=p, offset=offset)
-    assert sl.skip_lists == []
+    assert sl.skip_lists == [array('i', [1])]
     sl = BlockSkipList.from_list([1, 2], p=p, offset=offset)
-    assert sl.skip_lists == []
+    assert sl.skip_lists == [array('i', [1, 2])]
     sl = BlockSkipList.from_list([1, 2, 3], p=p, offset=offset)
-    assert sl.skip_lists == [array('i', [1, 3])]
+    assert sl.skip_lists == [array('i', [1, 2, 3]), array('i', [1, 3])]
     sl = BlockSkipList.from_list([1, 2, 3, 4], p=p, offset=offset)
-    assert sl.skip_lists == [array('i', [1, 3])]
+    assert sl.skip_lists == [array('i', [1, 2, 3, 4]), array('i', [1, 3])]
     sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, offset=offset)
-    assert sl.skip_lists == [array('i', [1, 3, 5]), array('i', [1, 5])]
+    assert sl.skip_lists == [array('i', [1, 2, 3, 4, 5]), array('i', [1, 3, 5]), array('i', [1, 5])]
     sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, offset=1)
-    assert sl.skip_lists == [array('i', [1, 3, 5])]
+    assert sl.skip_lists == [array('i', [1, 2, 3, 4, 5]), array('i', [1, 3, 5])]
 
 
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
