@@ -1,6 +1,5 @@
 import math
 import os
-import sys
 from array import array
 
 
@@ -49,16 +48,18 @@ class BlockSkipList(object):
             return self.ids[-1]
 
         # Check the start position.
-        level = len(self.skip_lists)
+        for level in range(1, len(self.skip_lists) + 1):
+            if doc_id_a <= self.last_id[level]:
+                break
         pos = self.current_pos[level]
+        skip_list = self.skip_lists[level - 1]
 
         # When the first item is greater than the given doc id.
-        if self.ids[pos] >= doc_id_a:
-            return self.ids[0]
+        if skip_list[pos] >= doc_id_a:
+            return skip_list[pos]
 
         # skip list
         while level > 0:
-            skip_list = self.skip_lists[level - 1]
             while True:
                 pos_id = skip_list[pos]
                 if pos_id < doc_id_a:
@@ -77,6 +78,7 @@ class BlockSkipList(object):
                     return pos_id
             pos = pos * self.p
             level -= 1
+            skip_list = self.skip_lists[level - 1]
 
         # ids
         for i in range(pos, len(self.ids)):
@@ -84,7 +86,8 @@ class BlockSkipList(object):
             if pos_id >= doc_id_a:
                 self.current_pos[0] = pos_id
                 return pos_id
-        return pos_id
+        self.current_pos[0] = len(self.ids) - 1
+        return self.ids[-1]
 
     def intersection(self, b) -> array:
         b.reset()
@@ -106,4 +109,4 @@ class BlockSkipList(object):
 
     def reset(self):
         self.current_pos = [0] * (len(self.skip_lists) + 1)
-        self.last_id = [0] * len(self.skip_lists)
+        self.last_id = [-1] * (len(self.skip_lists) + 1)

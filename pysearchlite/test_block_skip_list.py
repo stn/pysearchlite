@@ -67,7 +67,7 @@ def skip_list_and_test_cases(num, max_len):
     return tests
 
 
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 10))
+@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_intersection(a, b):
     s = BlockSkipList.from_list(a)
     t = BlockSkipList.from_list(b)
@@ -75,7 +75,7 @@ def test_skip_list_intersection(a, b):
     assert set(result) == set(a) & set(b)
 
 
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 10))
+@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_intersection_with_doc_ids(a, b):
     t = BlockSkipList.from_list(b)
     result = t.intersection_with_doc_ids(a)
