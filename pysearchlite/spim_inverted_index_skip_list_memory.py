@@ -5,7 +5,8 @@ from operator import itemgetter
 from typing import Optional, TextIO, BinaryIO, Literal
 
 from .inverted_index import InvertedIndex
-from .skip_list import SkipList
+# from .skip_list import SkipList
+from .block_skip_list import BlockSkipList
 
 TOKEN_LEN_BYTES = 2
 DOCID_BYTES = 4
@@ -44,7 +45,7 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
     def __init__(self, idx_dir: str, mem_limit=1000_000_000):
         super().__init__(idx_dir)
         self.raw_data: dict[str, list[int]] = {}
-        self.data: dict[str, SkipList] = {}
+        self.data: dict[str, BlockSkipList] = {}
         self.file: Optional[TextIO] = None
         self.tmp_index_num = 0
         self.raw_data_size = 0
@@ -161,7 +162,7 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
             ids = []
             for i in range(ids_len):
                 ids.append(int.from_bytes(self.file.read(DOCID_BYTES), BYTEORDER))
-            skip_list = SkipList.from_list(ids)
+            skip_list = BlockSkipList.from_list(ids)
             self.data[token] = (ids_len, skip_list)
             token = read_token(self.file)
 
