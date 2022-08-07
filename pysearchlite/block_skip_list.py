@@ -47,7 +47,7 @@ class BlockSkipList(object):
             return ids[-1]
 
         # Check the start position.
-        for level in range(1, len(self.skip_lists)):
+        for level in range(0, len(self.skip_lists)):
             if doc_id_a <= self.last_id[level]:
                 break
         pos = self.current_pos[level]
@@ -62,13 +62,15 @@ class BlockSkipList(object):
             while True:
                 pos_id = skip_list[pos]
                 if pos_id < doc_id_a:
-                    pos += 1
-                    if pos >= len(skip_list):
-                        self.current_pos[level] = pos - 1
+                    next_pos = pos + 1
+                    if next_pos >= len(skip_list):
+                        self.current_pos[level] = pos
                         self.last_id[level] = pos_id
                         break
+                    pos = next_pos
                 elif pos_id > doc_id_a:
-                    self.current_pos[level] = pos - 1
+                    pos -= 1
+                    self.current_pos[level] = pos
                     self.last_id[level] = pos_id
                     break
                 else:  # pos_id == doc_id_a:
@@ -83,9 +85,11 @@ class BlockSkipList(object):
         for i in range(pos, len(skip_list)):
             pos_id = skip_list[i]
             if pos_id >= doc_id_a:
-                self.current_pos[0] = pos_id
+                self.current_pos[0] = i
+                self.last_id[0] = pos_id
                 return pos_id
         self.current_pos[0] = len(skip_list) - 1
+        self.last_id[0] = skip_list[-1]
         return skip_list[-1]
 
     def intersection(self, b) -> array:
