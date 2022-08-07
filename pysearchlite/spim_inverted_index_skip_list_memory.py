@@ -2,42 +2,18 @@ import os
 import shutil
 from array import array
 from operator import itemgetter
-from typing import Optional, TextIO, BinaryIO, Literal
 
-from .inverted_index import InvertedIndex
-# from .skip_list import SkipList
 from .block_skip_list import BlockSkipList
+from .codecs import (
+    write_token, write_doc_ids, read_token,
+    copy_ids, merge_ids,
+    DOCID_LEN_BYTES, BYTEORDER, DOCID_BYTES,
+)
+from .inverted_index import InvertedIndex
 
-TOKEN_LEN_BYTES = 2
-DOCID_BYTES = 4
-DOCID_LEN_BYTES = 4
-
-BYTEORDER: Literal["big", "little"] = "big"
-B_INT32_0 = b"\x00\x00\x00\x00"
 
 POS_SIZE = 10
 TOKEN_SIZE = 20
-
-
-def write_token(f: BinaryIO, token: str):
-    encoded_token = token.encode('utf-8')
-    # TODO: check overflow
-    f.write(len(encoded_token).to_bytes(TOKEN_LEN_BYTES, BYTEORDER))
-    f.write(encoded_token)
-
-
-def read_token(f: BinaryIO) -> str:
-    token_bytes = f.read(TOKEN_LEN_BYTES)
-    if not token_bytes:
-        return ""
-    token_len = int.from_bytes(token_bytes, BYTEORDER)
-    return f.read(token_len).decode('utf-8')
-
-
-def write_doc_ids(f: BinaryIO, doc_ids: list[int]):
-    f.write(len(doc_ids).to_bytes(DOCID_LEN_BYTES, BYTEORDER))
-    for doc_id in doc_ids:
-        f.write(doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
 
 
 class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
@@ -76,22 +52,6 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
         self.tmp_index_num += 1
 
     def merge_index(self, idx1: str, idx2: str):
-        def copy_ids(dst: BinaryIO, src: BinaryIO):
-            docid_bytes = src.read(DOCID_LEN_BYTES)
-            doc_ids_len = int.from_bytes(docid_bytes, BYTEORDER)
-            dst.write(docid_bytes)
-            doc_ids_bytes = src.read(doc_ids_len * DOCID_BYTES)
-            dst.write(doc_ids_bytes)
-
-        def merge_ids(dst: BinaryIO, src1: BinaryIO, src2: BinaryIO):
-            doc_ids_len1 = int.from_bytes(src1.read(DOCID_LEN_BYTES), BYTEORDER)
-            doc_ids_len2 = int.from_bytes(src2.read(DOCID_LEN_BYTES), BYTEORDER)
-            dst.write((doc_ids_len1 + doc_ids_len2).to_bytes(DOCID_LEN_BYTES, BYTEORDER))
-            doc_ids_bytes = src1.read(doc_ids_len1 * DOCID_BYTES)
-            dst.write(doc_ids_bytes)
-            doc_ids_bytes = src2.read(doc_ids_len2 * DOCID_BYTES)
-            dst.write(doc_ids_bytes)
-
         with open(idx1, 'rb') as f1:
             with open(idx2, 'rb') as f2:
                 merged_index_name = self.tmp_index_name(self.tmp_index_num)
