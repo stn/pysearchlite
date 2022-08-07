@@ -27,24 +27,24 @@ def search_test_cases(num, max_len):
 
 def test_block_skip_list_fromlist():
     p = 2
-    offset = 0
-    sl = BlockSkipList.from_list([1], p=p, offset=offset)
+    max_level = 2
+    sl = BlockSkipList.from_list([1], p=p, max_level=max_level)
     assert sl.skip_lists == [array('i', [])]
-    sl = BlockSkipList.from_list([1, 2], p=p, offset=offset)
+    sl = BlockSkipList.from_list([1, 2], p=p, max_level=max_level)
     assert sl.skip_lists == [array('i', [])]
-    sl = BlockSkipList.from_list([1, 2, 3], p=p, offset=offset)
+    sl = BlockSkipList.from_list([1, 2, 3], p=p, max_level=max_level)
     assert sl.skip_lists == [array('i', []), array('i', [1, 3])]
-    sl = BlockSkipList.from_list([1, 2, 3, 4], p=p, offset=offset)
+    sl = BlockSkipList.from_list([1, 2, 3, 4], p=p, max_level=max_level)
     assert sl.skip_lists == [array('i', []), array('i', [1, 3])]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, offset=offset)
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, max_level=max_level)
     assert sl.skip_lists == [array('i', []), array('i', [1, 3, 5]), array('i', [1, 5])]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, offset=1)
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, max_level=1)
     assert sl.skip_lists == [array('i', []), array('i', [1, 3, 5])]
 
 
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
 def test_block_skip_list_search(arr, target):
-    skip_list = BlockSkipList.from_list(arr)
+    skip_list = BlockSkipList.from_list(arr, p=2)
     skip_list.reset()
     ret = skip_list.search(target)
     i = linear_search(arr, target)
@@ -69,14 +69,14 @@ def skip_list_and_test_cases(num, max_len):
 
 @pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_intersection(a, b):
-    s = BlockSkipList.from_list(a)
-    t = BlockSkipList.from_list(b)
+    s = BlockSkipList.from_list(a, p=2)
+    t = BlockSkipList.from_list(b, p=2)
     result = s.intersection(t)
     assert set(result) == set(a) & set(b)
 
 
 @pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_intersection_with_doc_ids(a, b):
-    t = BlockSkipList.from_list(b)
+    t = BlockSkipList.from_list(b, p=2)
     result = t.intersection_with_doc_ids(a)
     assert set(result) == set(a) & set(b)

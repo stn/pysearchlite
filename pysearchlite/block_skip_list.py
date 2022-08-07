@@ -3,8 +3,8 @@ import os
 from array import array
 
 
-SKIPLIST_P = int(os.environ.get('PYSEARCHLITE_SKIPLIST_P', '9'))
-OFFSET = int(os.environ.get('PYSEARCHLITE_SKIPLIST_OFFSET', '5'))
+SKIPLIST_P = int(os.environ.get('PYSEARCHLITE_SKIPLIST_P', '8'))
+SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
 
 
 class BlockSkipList(object):
@@ -17,8 +17,8 @@ class BlockSkipList(object):
         self.last_id = None
 
     @staticmethod
-    def from_list(ids: list[int], p=SKIPLIST_P, offset=OFFSET):
-        max_height = math.log(max(len(ids) - 1, 1), p) - offset
+    def from_list(ids: list[int], p=SKIPLIST_P, max_level=SKIPLIST_MAX_LEVEL):
+        max_height = min(math.log(max(len(ids) - 1, 1), p), max_level)
         skip_lists = [[]]
         for i in range(1, len(ids)):
             level = 1
