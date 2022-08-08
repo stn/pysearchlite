@@ -3,7 +3,7 @@ from random import randrange
 
 import pytest as pytest
 
-from .block_skip_list import BlockSkipList
+from .block_skip_list import BlockSkipList, SingleDocId, DocIdList
 
 
 def linear_search(arr, target, left=0, right=None):
@@ -29,9 +29,11 @@ def test_block_skip_list_fromlist():
     p = 2
     max_level = 2
     sl = BlockSkipList.from_list([1], p=p, max_level=max_level)
-    assert sl.skip_lists == [array('i', [])]
+    assert type(sl) == SingleDocId
+    assert sl.doc_id == 1
     sl = BlockSkipList.from_list([1, 2], p=p, max_level=max_level)
-    assert sl.skip_lists == [array('i', [])]
+    assert type(sl) == DocIdList
+    assert sl.ids == array('i', [1, 2])
     sl = BlockSkipList.from_list([1, 2, 3], p=p, max_level=max_level)
     assert sl.skip_lists == [array('i', []), array('i', [1, 3])]
     sl = BlockSkipList.from_list([1, 2, 3, 4], p=p, max_level=max_level)
