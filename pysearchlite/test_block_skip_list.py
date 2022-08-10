@@ -35,13 +35,20 @@ def test_block_skip_list_fromlist():
     assert type(sl) == DocIdList
     assert sl.ids == array('i', [1, 2])
     sl = BlockSkipList.from_list([1, 2, 3], p=p, max_level=max_level)
-    assert sl.skip_lists == [array('i', []), array('i', [1, 3])]
+    assert sl.max_level == 1
+    assert sl.blocks == [array('i', [1, 2, 2]), array('i', [1, 0, 3, 2]), array('i', [3])]
     sl = BlockSkipList.from_list([1, 2, 3, 4], p=p, max_level=max_level)
-    assert sl.skip_lists == [array('i', []), array('i', [1, 3])]
+    assert sl.max_level == 1
+    assert sl.blocks == [array('i', [1, 2, 2]), array('i', [1, 0, 3, 2]), array('i', [3, 4])]
     sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, max_level=max_level)
-    assert sl.skip_lists == [array('i', []), array('i', [1, 3, 5]), array('i', [1, 5])]
+    assert sl.max_level == 2
+    assert sl.blocks == [array('i', [1, 2, 3]), array('i', [1, 0, 3, 3, 5]), array('i', [1, 1, 5, 5]),
+                         array('i', [3, 4, 4]), array('i', [5]), array('i', [5, 4])]
     sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, max_level=1)
-    assert sl.skip_lists == [array('i', []), array('i', [1, 3, 5])]
+    assert sl.max_level == 1
+    assert sl.blocks == [array('i', [1, 2, 2]), array('i', [1, 0, 3, 2, 4]),
+                         array('i', [3, 4, 3]), array('i', [5]),
+                         array('i', [5, 3])]
 
 
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
