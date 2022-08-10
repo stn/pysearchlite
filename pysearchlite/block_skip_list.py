@@ -164,6 +164,8 @@ class BlockSkipList(object):
                 pos = 0
             doc_id_a = block[pos]
             doc_id_b = b.search(doc_id_a)
+            if doc_id_b < doc_id_a:  # reached to the end of b
+                break
             if doc_id_b == doc_id_a:
                 result.append(doc_id_a)
             pos += 1
