@@ -152,30 +152,23 @@ class BlockSkipList(object):
                 return pos_id
 
     def intersection(self, b) -> array:
-        self.reset()
+        block = self.blocks[0]
+        pos = 0
         b.reset()
         result = array('i')
-        doc_id_a = self.search(0)
         while True:
+            if pos == len(block):  # end of ids
+                break
+            if pos == self.p:
+                block = self.blocks[block[pos]]
+                pos = 0
+            doc_id_a = block[pos]
             doc_id_b = b.search(doc_id_a)
             if doc_id_b < doc_id_a:  # reached to the end of b
                 break
             if doc_id_b == doc_id_a:
                 result.append(doc_id_a)
-                i = self.search(doc_id_a + 1)
-                if i <= doc_id_a:
-                    break
-                doc_id_a = i
-            else:  # doc_id_b > doc_id_a
-                doc_id_a = self.search(doc_id_b)
-                if doc_id_a == doc_id_b:
-                    result.append(doc_id_a)
-                    i = self.search(doc_id_a + 1)
-                    if i <= doc_id_a:
-                        break
-                    doc_id_a = i
-                elif doc_id_a < doc_id_b:
-                    break
+            pos += 1
         return result
 
     def intersection_with_doc_ids(self, a: array) -> array:
