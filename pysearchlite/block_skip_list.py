@@ -2,6 +2,8 @@ import math
 import os
 from array import array
 
+from pysearchlite import codecs
+
 
 SKIPLIST_P = int(os.environ.get('PYSEARCHLITE_SKIPLIST_P', '8'))
 SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
@@ -187,6 +189,9 @@ class BlockSkipList(object):
         self.last_pos = [0] * (self.max_level + 1)
         self.last_id = [-1] * (self.max_level + 1)
 
+    def write(self, file):
+        codecs.write_block_skip_list(self, file)
+
 
 class DocIdList(object):
 
@@ -227,6 +232,9 @@ class DocIdList(object):
     def reset(self):
         self.current_pos = 0
 
+    def write(self, file):
+        codecs.write_doc_ids_list(self, file)
+
 
 class SingleDocId(object):
 
@@ -259,3 +267,6 @@ class SingleDocId(object):
 
     def reset(self):
         pass
+
+    def write(self, file):
+        codecs.write_single_doc_id(self, file)

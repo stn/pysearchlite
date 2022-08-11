@@ -2,10 +2,11 @@ from typing import Optional
 
 from .doc_list import DocList, MemoryDocList
 from .inverted_index import InvertedIndex
+from .inverted_index_skip_list import InvertedIndexBlockSkipList
 # from .memory_inverted_index import MemoryInvertedIndex
 # from .spim_inverted_index import SinglePassInMemoryInvertedIndex
-from .spim_inverted_index_memory import SinglePassInMemoryInvertedIndexMemory
-from .spim_inverted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
+# from .spim_inverted_index_memory import SinglePassInMemoryInvertedIndexMemory
+# from .spim_inverted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
 # from .spim_inverted_index_memory_binary import SinglePassInMemoryInvertedIndexMemoryBinary
 from .tokenize import normalized_tokens
 
@@ -18,7 +19,8 @@ def init(idx_dir: str):
     global DOC_LIST, INVERTED_INDEX
     DOC_LIST = MemoryDocList(idx_dir)
     # INVERTED_INDEX = SinglePassInMemoryInvertedIndexMemory(idx_dir)
-    INVERTED_INDEX = SinglePassInMemoryInvertedIndexSkipListMemory(idx_dir)
+    # INVERTED_INDEX = SinglePassInMemoryInvertedIndexSkipListMemory(idx_dir)
+    INVERTED_INDEX = InvertedIndexBlockSkipList(idx_dir)
 
 
 def index(name: str, text: str):
