@@ -4,7 +4,7 @@ import sys
 from array import array
 
 from pysearchlite import codecs
-from pysearchlite.codecs import DOCID_BYTES, BYTEORDER
+from pysearchlite.codecs import DOCID_BYTES, BYTEORDER, SKIP_LIST_BLOCK_INDEX_BYTES
 
 SKIPLIST_P = int(os.environ.get('PYSEARCHLITE_SKIPLIST_P', '8'))
 SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
@@ -203,10 +203,10 @@ class BlockSkipList(object):
 class BlockSkipListExt(object):
 
     def __init__(self, mmap, pos, freq):
-        self.p = SKIPLIST_P
-        self.max_level = 0
         self.mmap = mmap
-        self.offset = pos
+        self.p = int.from_bytes(mmap[pos:pos+1], sys.byteorder)
+        self.max_level = int.from_bytes(mmap[pos+1:pos+2], sys.byteorder)
+        self.offset = pos + 2 + SKIP_LIST_BLOCK_INDEX_BYTES
         self.freq = freq
         self.last_block = None
         self.last_pos = None
