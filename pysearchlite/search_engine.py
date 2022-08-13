@@ -1,5 +1,6 @@
 from typing import Optional
 
+from .codecs import BYTEORDER
 from .doc_list import DocList, MemoryDocList
 from .inverted_index import InvertedIndex
 from .inverted_index_skip_list import InvertedIndexBlockSkipList
@@ -52,7 +53,7 @@ def search(query: str) -> list[str]:
         doc_ids = INVERTED_INDEX.get(query_tokens[0])
     else:
         doc_ids = INVERTED_INDEX.search_and(query_tokens)
-    return [DOC_LIST.get(doc_id) for doc_id in doc_ids]
+    return [DOC_LIST.get(int.from_bytes(doc_id, BYTEORDER)) for doc_id in doc_ids]
 
 
 def count(query: str) -> int:

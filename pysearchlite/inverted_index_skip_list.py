@@ -1,11 +1,14 @@
 import mmap
 import os
 import shutil
+import sys
 from operator import itemgetter
 from typing import Optional, TextIO, BinaryIO, Union, Literal
 
-from .block_skip_list import BlockSkipList
-from .codecs import read_token, write_token, copy_ids, write_doc_ids, merge_ids, read_doc_ids
+from .block_skip_list import BlockSkipList, DocIdListExt, BlockSkipListExt, LIST_TYPE_DOC_ID, LIST_TYPE_DOC_IDS_LIST, \
+    LIST_TYPE_SKIP_LIST
+from .codecs import read_token, write_token, copy_ids, write_doc_ids, merge_ids, read_doc_ids, BLOCK_TYPE_DOC_ID, \
+    DOCID_BYTES, BYTEORDER, BLOCK_TYPE_DOC_IDS_LIST, DOCID_LEN_BYTES, BLOCK_TYPE_SKIP_LIST, SKIP_LIST_BLOCK_INDEX_BYTES
 from .inverted_index import InvertedIndex
 
 
@@ -18,7 +21,7 @@ class InvertedIndexBlockSkipList(InvertedIndex):
     def __init__(self, idx_dir: str, mem_limit=1000_000_000):
         super().__init__(idx_dir)
         self.raw_data: dict[str, list[int]] = {}
-        self.data: dict[str, int] = {}
+        self.data = {}
         self.file: Optional[TextIO] = None
         self.mmap: Optional[mmap.mmap] = None
         self.tmp_index_num = 0
@@ -136,221 +139,51 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         self.mmap = mmap.mmap(self.file.fileno(), length=0, access=mmap.ACCESS_READ)
         token = read_token(self.mmap)
         while token:
-            block_type = self.mmap.read_byte()
+            block_type = self.mmap.read(1)
             if block_type == BLOCK_TYPE_DOC_ID:
-                doc_id = int.from_bytes(self.mmap.read(DOCID_BYTES), BYTEORDER)
-                self.data[token] = (1, doc_id)
+                doc_id = self.mmap.read(DOCID_BYTES)
+                self.data[token] = (1, LIST_TYPE_DOC_ID, doc_id)
             elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
-                ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), BYTEORDER)
+                ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
                 pos = self.mmap.tell()
-                self.data[token] = (ids_len, pos)
+                self.data[token] = (ids_len, LIST_TYPE_DOC_IDS_LIST, pos)
                 self.mmap.seek(ids_len * DOCID_BYTES, 1)
-            elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
-                pass  # TODO
+            elif block_type == BLOCK_TYPE_SKIP_LIST:
+                freq = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
+                pos = self.mmap.tell()
+                self.data[token] = (freq, LIST_TYPE_SKIP_LIST, pos)
+                p = int.from_bytes(self.mmap.read(1), sys.byteorder)
+                self.mmap.seek(1, 1)  # max_level
+                blocks = int.from_bytes(self.mmap.read(SKIP_LIST_BLOCK_INDEX_BYTES), sys.byteorder)
+                block_size = (p * 2 + 1) * DOCID_BYTES
+                self.mmap.seek(blocks * block_size, 1)
             else:
-                pass  # TODO error
+                raise ValueError(f"Unsupported block type: {block_type}")
             token = read_token(self.mmap)
 
-    def get(self, token: str) -> list[int]:
-        ids_len, pos = self.data.get(token, (0, -1))
-        if ids_len == 0:
+    def get(self, token):
+        freq, list_type, pos = self.data.get(token, (0, 0, 0))
+        if freq == 0:
             return []
-        ids = []
-        for _ in range(ids_len):
-            ids.append(int.from_bytes(self.mmap[pos:pos + DOCID_BYTES], BYTEORDER))
-            pos += DOCID_BYTES
-        return ids
+        elif freq == 1:
+            return [pos]
+        elif list_type == LIST_TYPE_DOC_IDS_LIST:
+            return DocIdListExt(self.mmap, pos, freq).get_ids()
+        elif list_type == LIST_TYPE_SKIP_LIST:
+            return BlockSkipListExt(self.mmap, pos, freq).get_ids()
 
-    def prepare_state(self, tokens: list[str]) -> list[(int, int)]:
+    def prepare_state(self, tokens: list[str]) -> list[(int, int, int)]:
         # confirm if all tokens are in index.
         state = []
         for t in tokens:
-            l, pos = self.data.get(t, (0, -1))
-            if l == 0:
+            freq, list_type, pos = self.data.get(t, (0, 0, 0))
+            if freq == 0:
                 return []
-            state.append((l, pos))
+            state.append((freq, list_type, pos))
         state.sort(key=itemgetter(0))
         return state
 
-    def binary_search(self, pos: int, doc_id: bytes, left: int, right: int) -> int:
-        while left < right:
-            m = (left + right) // 2
-            m_pos = pos + m * DOCID_BYTES
-            if self.mmap[m_pos:m_pos + DOCID_BYTES] < doc_id:
-                left = m + 1
-            else:
-                right = m
-        return left
-
-    def binary_search_a(self, a: list[bytes], doc_id: bytes, left: int, right: int) -> int:
-        while left < right:
-            m = (left + right) // 2
-            if a[m] < doc_id:
-                left = m + 1
-            else:
-                right = m
-        return left
-
-    def double_binary_search_pos(self,
-                                 pos_a: int, left_a: int, right_a: int,
-                                 pos_b: int, left_b: int, right_b: int,
-                                 result: list[bytes]):
-        if left_a >= right_a or left_b >= right_b:
-            return
-
-        if right_a - left_a == 1:
-            ma_pos = pos_a + left_a * DOCID_BYTES
-            ma_val = self.mmap[ma_pos:ma_pos + DOCID_BYTES]
-            if right_b - left_b == 1:
-                mb_pos = pos_b + left_b * DOCID_BYTES
-                mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-                if mb_val == ma_val:
-                    result.append(ma_val)
-                return
-
-            mb = self.binary_search(pos_b, ma_val, left_b, right_b)
-            if mb >= right_b:
-                return
-            mb_pos = pos_b + mb * DOCID_BYTES
-            mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-            if mb_val == ma_val:
-                result.append(ma_val)
-            return
-
-        ma = (left_a + right_a) // 2
-        ma_pos = pos_a + ma * DOCID_BYTES
-        ma_val = self.mmap[ma_pos:ma_pos + DOCID_BYTES]
-        mb = self.binary_search(pos_b, ma_val, left_b, right_b)
-        if mb >= right_b:
-            self.double_binary_search_pos(pos_a, left_a, ma, pos_b, left_b, right_b, result)
-            return
-
-        mb_pos = pos_b + mb * DOCID_BYTES
-        mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-        if mb_val > ma_val:
-            self.double_binary_search_pos(pos_a, left_a, ma, pos_b, left_b, mb, result)
-            self.double_binary_search_pos(pos_a, ma + 1, right_a, pos_b, mb, right_b, result)
-        else:  # mb_val == ma_val
-            self.double_binary_search_pos(pos_a, left_a, ma, pos_b, left_b, mb, result)
-            result.append(ma_val)
-            self.double_binary_search_pos(pos_a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-
-    def double_binary_search(self,
-                             a: list[bytes], left_a: int, right_a: int,
-                             pos_b: int, left_b: int, right_b: int,
-                             result: list[bytes]):
-        if left_a >= right_a or left_b >= right_b:
-            return
-
-        if right_a - left_a == 1:
-            ma_val = a[left_a]
-            if right_b - left_b == 1:
-                mb_pos = pos_b + left_b * DOCID_BYTES
-                mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-                if mb_val == ma_val:
-                    result.append(ma_val)
-                return
-
-            mb = self.binary_search(pos_b, ma_val, left_b, right_b)
-            if mb >= right_b:
-                return
-            mb_pos = pos_b + mb * DOCID_BYTES
-            mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-            if mb_val == ma_val:
-                result.append(ma_val)
-            return
-
-        ma = (left_a + right_a) // 2
-        ma_val = a[ma]
-        mb = self.binary_search(pos_b, ma_val, left_b, right_b)
-        if mb >= right_b:
-            self.double_binary_search(a, left_a, ma, pos_b, left_b, right_b, result)
-            return
-
-        mb_pos = pos_b + mb * DOCID_BYTES
-        mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-        if mb_val > ma_val:
-            self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            # According to the bench mark results, the follwoing branches were slower.
-            #
-            # if ma - left_a <= mb - left_b:
-            #     self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            # else:
-            #     self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb, result)
-            self.double_binary_search(a, ma + 1, right_a, pos_b, mb, right_b, result)
-            # if right_a - ma - 1 <= right_b - mb:
-            #     self.double_binary_search(a, ma + 1, right_a, pos_b, mb, right_b, result)
-            # else:
-            #     self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb, right_b, result)
-        else:  # mb_val == ma_val
-            self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            # if ma - left_a <= mb - left_b:
-            #     self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            # else:
-            #     self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb, result)
-            result.append(ma_val)
-            self.double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-            # if right_a - ma <= right_b < mb:
-            #     self.double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-            # else:
-            #     self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-
-    def double_binary_search_b(self,
-                               a: list[bytes], left_a: int, right_a: int,
-                               pos_b: int, left_b: int, right_b: int,
-                               result: list[bytes]):
-        if left_a >= right_a or left_b >= right_b:
-            return
-
-        if right_b - left_b == 1:
-            mb_pos = pos_b + left_b * DOCID_BYTES
-            mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-            if right_a - left_a == 1:
-                ma_val = a[left_a]
-                if mb_val == ma_val:
-                    result.append(mb_val)
-                return
-
-            ma = self.binary_search_a(a, mb_val, left_a, right_a)
-            if ma >= right_a:
-                return
-            ma_val = a[ma]
-            if ma_val == mb_val:
-                result.append(mb_val)
-            return
-
-        mb = (left_b + right_b) // 2
-        mb_pos = pos_b + mb * DOCID_BYTES
-        mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-        ma = self.binary_search_a(a, mb_val, left_a, right_a)
-        if ma >= right_a:
-            self.double_binary_search_b(a, left_a, right_a, pos_b, left_b, mb, result)
-            return
-
-        mb_pos = pos_b + mb * DOCID_BYTES
-        mb_val = self.mmap[mb_pos:mb_pos + DOCID_BYTES]
-        ma_val = a[ma]
-        if ma_val > mb_val:
-            if ma - left_a >= mb - left_b:
-                self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb, result)
-            else:
-                self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            if right_a - ma - 1 >= right_b - mb:
-                self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb, right_b, result)
-            else:
-                self.double_binary_search(a, ma + 1, right_a, pos_b, mb, right_b, result)
-        else:  # ma_val == mb_val
-            if ma - left_a >= mb - left_b:
-                self.double_binary_search_b(a, left_a, ma, pos_b, left_b, mb, result)
-            else:
-                self.double_binary_search(a, left_a, ma, pos_b, left_b, mb, result)
-            result.append(ma_val)
-            if right_a - ma >= right_b - mb:
-                self.double_binary_search_b(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-            else:
-                self.double_binary_search(a, ma + 1, right_a, pos_b, mb + 1, right_b, result)
-
-    def search_and(self, tokens: list[str]) -> list[int]:
+    def search_and(self, tokens):
         if len(tokens) == 1:
             return self.get(tokens[0])
 
@@ -358,38 +191,36 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         if not state:
             return []
 
-        result = []
-        n_a, pos_a = state[0]
-        n_b, pos_b = state[1]  # since len(tokens) >= 2
-        self.double_binary_search_pos(pos_a, 0, n_a, pos_b, 0, n_b, result)
-        doc_ids = result
-        # when len(tokens) >= 3
-        for i, (n_b, pos_b) in enumerate(state[2:]):
-            result = []
-            self.double_binary_search(doc_ids, 0, len(doc_ids), pos_b, 0, n_b, result)
-            doc_ids = result
-        return [int.from_bytes(doc_id, BYTEORDER) for doc_id in doc_ids]
+        freq_a, list_type_a, pos_a = state[0]
+        freq_b, list_type_b, pos_b = state[1]
+        list_a = BlockSkipListExt.of(freq_a, list_type_a, self.mmap, pos_a)
+        list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
+        doc_ids_a = list_a.intersection(list_b)
+        # find common doc ids
+        for i, (freq_b, list_type_b, pos_b) in enumerate(state[2:]):
+            list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
+            doc_ids_a = list_b.intersection_with_doc_ids(doc_ids_a)
+        return doc_ids_a
 
-    def count_and(self, tokens: list[str]) -> int:
+    def count_and(self, tokens):
         if len(tokens) == 1:
-            ids_len, _ = self.data.get(tokens[0], (0, -1))
-            return ids_len
+            freq, _, _ = self.data.get(tokens[0], (0, 0, 0))
+            return freq
 
         state = self.prepare_state(tokens)
         if not state:
             return 0
 
-        result = []
-        n_a, pos_a = state[0]
-        n_b, pos_b = state[1]  # since len(tokens) >= 2
-        self.double_binary_search_pos(pos_a, 0, n_a, pos_b, 0, n_b, result)
-        doc_ids = result
-        # when len(tokens) >= 3
-        for i, (n_b, pos_b) in enumerate(state[2:]):
-            result = []
-            self.double_binary_search(doc_ids, 0, len(doc_ids), pos_b, 0, n_b, result)
-            doc_ids = result
-        return len(doc_ids)
+        freq_a, list_type_a, pos_a = state[0]
+        freq_b, list_type_b, pos_b = state[1]
+        list_a = BlockSkipListExt.of(freq_a, list_type_a, self.mmap, pos_a)
+        list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
+        doc_ids_a = list_a.intersection(list_b)
+        # find common doc ids
+        for freq_b, list_type_b, pos_b in state[2:]:
+            list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
+            doc_ids_a = list_b.intersection_with_doc_ids(doc_ids_a)
+        return len(doc_ids_a)
 
     def clear(self):
         self.raw_data = {}

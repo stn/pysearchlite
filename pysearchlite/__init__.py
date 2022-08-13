@@ -13,6 +13,7 @@ from .doc_list import (
     MemoryDocList,
 )
 from .inverted_index import InvertedIndex
+from .inverted_index_skip_list import InvertedIndexBlockSkipList
 from .memory_inverted_index import MemoryInvertedIndex
 from .spim_inverted_index import SinglePassInMemoryInvertedIndex
 from .spim_inverted_index_memory import SinglePassInMemoryInvertedIndexMemory

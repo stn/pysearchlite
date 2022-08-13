@@ -151,7 +151,7 @@ class SinglePassInMemoryInvertedIndexSkipListMemory(InvertedIndex):
         # find common doc ids
         for i, (n_b, skip_list_b) in enumerate(state[2:]):
             doc_ids_a = skip_list_b.intersection_with_doc_ids(doc_ids_a)
-        return doc_ids_a.tolist()
+        return doc_ids_a
 
     def count_and(self, tokens: list[str]) -> int:
         if len(tokens) == 1:
