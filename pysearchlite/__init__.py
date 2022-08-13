@@ -21,4 +21,4 @@ from .spim_inverted_index_memory_binary import SinglePassInMemoryInvertedIndexMe
 from .spim_inverted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
 
 
-VERSION = '0.4.15'
+VERSION = '0.4.16'
