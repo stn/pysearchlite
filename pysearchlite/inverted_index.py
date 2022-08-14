@@ -7,26 +7,26 @@ INVERTED_INDEX_FILENAME = "inverted_index"
 
 class InvertedIndex(abc.ABC):
 
-    def __init__(self, idx_dir: str = None):
+    def __init__(self, idx_dir=None):
         self.idx_dir = idx_dir
         if idx_dir:
             os.makedirs(idx_dir, exist_ok=True)
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="pysearchlite_")
 
     @abc.abstractmethod
-    def add(self, idx: int, tokens: list[str]):
+    def add(self, idx, tokens):
         pass
 
     @abc.abstractmethod
-    def get(self, token: str) -> list[int]:
+    def get(self, token):
         pass
 
     @abc.abstractmethod
-    def search_and(self, tokens: list[str]) -> list[int]:
+    def search_and(self, tokens):
         pass
 
     @abc.abstractmethod
-    def count_and(self, tokens: list[str]) -> int:
+    def count_and(self, tokens):
         pass
 
     @abc.abstractmethod

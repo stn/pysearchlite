@@ -28,7 +28,7 @@ class BlockSkipList(object):
         self.last_id = None
 
     @staticmethod
-    def from_list(ids: list[int], p=SKIPLIST_P, max_level=SKIPLIST_MAX_LEVEL):
+    def from_list(ids, p=SKIPLIST_P, max_level=SKIPLIST_MAX_LEVEL):
         if len(ids) == 1:
             return SingleDocId(ids[0])
         elif len(ids) <= p:
@@ -96,7 +96,7 @@ class BlockSkipList(object):
             pos += 1
         return result
 
-    def search(self, doc_id_a: int):
+    def search(self, doc_id_a):
         # Check the start position.
         for level in range(self.max_level + 1):
             if doc_id_a <= self.last_id[level]:
@@ -182,7 +182,7 @@ class BlockSkipList(object):
                 self.last_id[0] = pos_id
                 return pos_id
 
-    def intersection(self, b) -> array:
+    def intersection(self, b):
         block_idx = 0
         block = self.blocks[0]
         pos = 0
@@ -208,7 +208,7 @@ class BlockSkipList(object):
             pos += 1
         return result
 
-    def intersection_with_doc_ids(self, a: array) -> array:
+    def intersection_with_doc_ids(self, a):
         self.reset()
         result = array('i')
         for doc_id_a in a:
@@ -433,10 +433,10 @@ class DocIdList(object):
         self.ids = array('i', ids)
         self.current_pos = 0
 
-    def get_ids(self) -> list[int]:
+    def get_ids(self):
         return self.ids.tolist()
 
-    def search(self, doc_id_a: int):
+    def search(self, doc_id_a):
         for i in range(self.current_pos, len(self.ids)):
             if self.ids[i] >= doc_id_a:
                 self.current_pos = i
@@ -478,10 +478,10 @@ class DocIdListExt(object):
         self.offset = offset
         self.current_pos = 0
 
-    def get_ids(self) -> list[bytes]:
+    def get_ids(self):
         return codecs.read_doc_ids_list(self.mmap, self.offset, self.freq)
 
-    def search(self, doc_id_a: bytes):
+    def search(self, doc_id_a):
         doc_id = -1
         i = self.current_pos
         for i in range(self.current_pos, self.freq):
@@ -523,10 +523,10 @@ class SingleDocId(object):
     def __init__(self, doc_id):
         self.doc_id = doc_id
 
-    def get_ids(self) -> list[int]:
+    def get_ids(self):
         return [self.doc_id]
 
-    def search(self, doc_id_a: int):
+    def search(self, doc_id_a):
         # it can return a smaller id than id_a.
         return self.doc_id
 

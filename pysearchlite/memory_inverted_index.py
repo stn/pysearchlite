@@ -3,25 +3,25 @@ from .inverted_index import InvertedIndex
 
 class MemoryInvertedIndex(InvertedIndex):
 
-    def __init__(self, idx_dir: str):
+    def __init__(self, idx_dir):
         super().__init__(idx_dir)
-        self.data: dict[str, list[int]] = {}
+        self.data = {}
 
-    def add(self, idx: int, tokens: list[str]):
+    def add(self, idx, tokens):
         for token in set(tokens):
             if token in self.data:
                 self.data[token].append(idx)
             else:
                 self.data[token] = [idx]
 
-    def get(self, token: str) -> list[int]:
+    def get(self, token):
         ids = self.data.get(token, [])
         return ids
 
-    def search_and(self, tokens: list[str]) -> list[int]:
+    def search_and(self, tokens):
         raise NotImplementedError()
 
-    def count_and(self, tokens: list[str]) -> int:
+    def count_and(self, tokens):
         raise NotImplementedError()
 
     def save(self):

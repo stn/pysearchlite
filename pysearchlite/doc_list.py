@@ -6,15 +6,15 @@ DOC_LIST_FILENAME = "doc_list"
 
 class DocList(abc.ABC):
 
-    def __init__(self, idx_dir: str):
+    def __init__(self, idx_dir):
         self.idx_dir = idx_dir
 
     @abc.abstractmethod
-    def add(self, name: str) -> int:
+    def add(self, name):
         pass
 
     @abc.abstractmethod
-    def get(self, idx: int) -> str:
+    def get(self, idx):
         pass
 
     @abc.abstractmethod
@@ -35,16 +35,16 @@ class DocList(abc.ABC):
 
 class MemoryDocList(DocList):
 
-    def __init__(self, idx_dir: str):
+    def __init__(self, idx_dir):
         super().__init__(idx_dir)
-        self.doc_list: list[str] = []
+        self.doc_list = []
 
-    def add(self, name: str) -> int:
+    def add(self, name):
         idx = len(self.doc_list)
         self.doc_list.append(name)
         return idx
 
-    def get(self, idx: int) -> str:
+    def get(self, idx):
         return self.doc_list[idx]
 
     def save(self):
