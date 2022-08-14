@@ -71,31 +71,12 @@ def write_block_skip_list(skip_list, file):
     file.write(skip_list.max_level.to_bytes(1, sys.byteorder))
     file.write(len(skip_list.blocks).to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
     block_size = (skip_list.p * 2 + 1) * DOCID_BYTES
-    for block in skip_list.blocks:
-        b = b''.join([doc_id.to_bytes(DOCID_BYTES, BYTEORDER) for doc_id in block])
+    for i, block in enumerate(skip_list.blocks):
+        b = skip_list.next_block_idx[i].to_bytes(DOCID_BYTES, sys.byteorder)
+        b += b''.join([doc_id.to_bytes(DOCID_BYTES, BYTEORDER) for doc_id in block])
         if len(b) < block_size:
             b = b.ljust(block_size, b'\x00')
         file.write(b)
-
-
-def read_doc_ids_from_block_skip_list(mem, pos, freq):
-    p = mem[pos]
-    pos += 2 + SKIP_LIST_BLOCK_INDEX_BYTES
-    block_size = (p * 2 + 1) * DOCID_BYTES
-    i = 0
-    offset = pos
-    ids = []
-    while True:
-        ids.append(mem[offset:offset + DOCID_BYTES])
-        freq -= 1
-        if freq == 0:
-            break
-        offset += DOCID_BYTES
-        i += 1
-        if i == p:
-            offset = int.from_bytes(mem[offset:offset + DOCID_BYTES], BYTEORDER) * block_size + pos
-            i = 0
-    return ids
 
 
 def write_doc_ids_list(doc_ids, file):
