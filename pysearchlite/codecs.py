@@ -31,17 +31,33 @@ def read_token(f):
     return f.read(token_len).decode('utf-8')
 
 
+def encode_docid(doc_id):
+    return doc_id.to_bytes(DOCID_BYTES, "big")
+
+
+def decode_docid(doc_id):
+    return int.from_bytes(doc_id, "big")
+
+
+def encode_block_idx(idx):
+    return idx.to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder)
+
+
+def decode_block_idx(idx):
+    return int.from_bytes(idx, sys.byteorder)
+
+
 def write_doc_ids(f, doc_ids):
     f.write(len(doc_ids).to_bytes(DOCID_LEN_BYTES, BYTEORDER))
     for doc_id in doc_ids:
-        f.write(doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
+        f.write(encode_docid(doc_id))
 
 
 def read_doc_ids(f):
     doc_ids_len = int.from_bytes(f.read(DOCID_LEN_BYTES), BYTEORDER)
     doc_ids = []
     for _ in range(doc_ids_len):
-        doc_ids.append(int.from_bytes(f.read(DOCID_BYTES), BYTEORDER))
+        doc_ids.append(decode_docid(f.read(DOCID_BYTES)))
     return doc_ids
 
 
@@ -69,10 +85,10 @@ def write_block_skip_list(skip_list, file):
     file.write(skip_list.p.to_bytes(1, sys.byteorder))
     file.write(skip_list.max_level.to_bytes(1, sys.byteorder))
     file.write(len(skip_list.blocks).to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
-    block_size = (skip_list.p * 2 + 1) * DOCID_BYTES
+    block_size = (skip_list.p * 2) * DOCID_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES
     for i, block in enumerate(skip_list.blocks):
-        b = skip_list.next_block_idx[i].to_bytes(DOCID_BYTES, sys.byteorder)
-        b += b''.join([doc_id.to_bytes(DOCID_BYTES, BYTEORDER) for doc_id in block])
+        b = encode_block_idx(skip_list.next_block_idx[i])
+        b += b''.join(block)
         if len(b) < block_size:
             b = b.ljust(block_size, b'\x00')
         file.write(b)
@@ -82,7 +98,7 @@ def write_doc_ids_list(doc_ids, file):
     file.write(BLOCK_TYPE_DOC_IDS_LIST)
     file.write(len(doc_ids.ids).to_bytes(DOCID_LEN_BYTES, sys.byteorder))
     for doc_id in doc_ids.ids:
-        file.write(doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
+        file.write(doc_id)
 
 
 def read_doc_ids_list(mem, pos, freq):
@@ -95,4 +111,4 @@ def read_doc_ids_list(mem, pos, freq):
 
 def write_single_doc_id(doc_id, file):
     file.write(BLOCK_TYPE_DOC_ID)
-    file.write(doc_id.doc_id.to_bytes(DOCID_BYTES, BYTEORDER))
+    file.write(doc_id)
