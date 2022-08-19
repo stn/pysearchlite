@@ -13,6 +13,10 @@ B_2 = b'\x00\x00\x00\x02'
 B_3 = b'\x00\x00\x00\x03'
 B_4 = b'\x00\x00\x00\x04'
 B_5 = b'\x00\x00\x00\x05'
+B_6 = b'\x00\x00\x00\x06'
+B_7 = b'\x00\x00\x00\x07'
+B_8 = b'\x00\x00\x00\x08'
+B_9 = b'\x00\x00\x00\x09'
 
 L_0 = b'\x00\x00\x00\x00'
 L_1 = b'\x01\x00\x00\x00'
@@ -42,50 +46,40 @@ def search_test_cases(num, max_len):
 
 
 def test_block_skip_list_fromlist():
-    p = 2
+    block_size = 20
     max_level = 2
-    sl = BlockSkipList.from_list([1], p=p, max_level=max_level)
+    sl = BlockSkipList.from_list([1], block_size=block_size, max_level=max_level)
     assert type(sl) == SingleDocId
     assert sl.doc_id == B_1
-    sl = BlockSkipList.from_list([1, 2], p=p, max_level=max_level)
+    sl = BlockSkipList.from_list([1, 2], block_size=block_size, max_level=max_level)
     assert type(sl) == DocIdList
     assert sl.ids == [B_1, B_2]
-    sl = BlockSkipList.from_list([1, 2, 3], p=p, max_level=max_level)
+    sl = BlockSkipList.from_list([1, 2, 3], block_size=block_size, max_level=max_level)
+    assert type(sl) == DocIdList
+    assert sl.ids == [B_1, B_2, B_3]
+    sl = BlockSkipList.from_list([1, 2, 3, 4], block_size=block_size, max_level=max_level)
+    assert type(sl) == DocIdList
+    assert sl.ids == [B_1, B_2, B_3, B_4]
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], block_size=block_size, max_level=max_level)
     assert sl.max_level == 1
-    assert sl.blocks == [[B_1, B_2], [B_1, L_0, B_3, L_2], [B_3]]
-    assert sl.next_block_idx == [2, 0, 0]
-    sl = BlockSkipList.from_list([1, 2, 3, 4], p=p, max_level=max_level)
-    assert sl.max_level == 1
-    assert sl.blocks == [[B_1, B_2], [B_1, L_0, B_3, L_2], [B_3, B_4]]
-    assert sl.next_block_idx == [2, 0, 0]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, max_level=max_level)
+    assert sl.blocks == [bytearray(B_1 + B_2 + B_3 + B_4), bytearray(B_5), bytearray(B_1 + L_0 + B_5 + L_1)]
+    assert sl.next_block_idx == [1, 0, 0]
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=block_size, max_level=max_level)
     assert sl.max_level == 2
-    assert sl.blocks == [[B_1, B_2], [B_1, L_0, B_3, L_3], [B_1, L_1, B_5, L_5],
-                         [B_3, B_4], [B_5], [B_5, L_4]]
-    assert sl.next_block_idx == [3, 5, 0, 4, 0, 0]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], p=p, max_level=1)
+    assert sl.blocks == [bytearray(B_1 + B_2 + B_3 + B_4), bytearray(B_5 + B_6 + B_7 + B_8),
+                         bytearray(B_1 + L_0 + B_5 + L_1), bytearray(B_9), bytearray(B_9 + L_3),
+                         bytearray(B_1 + L_2 + B_9 + L_4)]
+    assert sl.next_block_idx == [1, 3, 4, 0, 0, 0]
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=block_size, max_level=1)
     assert sl.max_level == 1
-    assert sl.blocks == [[B_1, B_2], [B_1, L_0, B_3, L_2],
-                         [B_3, B_4], [B_5],
-                         [B_5, L_3]]
-    assert sl.next_block_idx == [2, 4, 3, 0, 0]
-
-
-@pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
-def test_block_skip_list_search(arr, target):
-    skip_list = BlockSkipList.from_list(arr, p=2)
-    skip_list.reset()
-    ret = skip_list.search(encode_docid(target))
-    i = linear_search(arr, target)
-    if i == len(arr):
-        assert decode_docid(ret) == arr[-1]
-    else:
-        assert decode_docid(ret) == arr[i]
+    assert sl.blocks == [bytearray(B_1 + B_2 + B_3 + B_4), bytearray(B_5 + B_6 + B_7 + B_8),
+                         bytearray(B_1 + L_0 + B_5 + L_1), bytearray(B_9), bytearray(B_9 + L_3)]
+    assert sl.next_block_idx == [1, 3, 4, 0, 0]
 
 
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
 def test_block_skip_list_ext_search(arr, target):
-    skip_list = BlockSkipList.from_list(arr, p=2)
+    skip_list = BlockSkipList.from_list(arr, block_size=16)
     with TemporaryFile(prefix="pysearchlite_") as file:
         skip_list.write(file)
         file.seek(0)
@@ -114,17 +108,11 @@ def skip_list_and_test_cases(num, max_len):
 
 
 @pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
-def test_skip_list_intersection(a, b):
-    s = BlockSkipList.from_list(a, p=2)
-    t = BlockSkipList.from_list(b, p=2)
-    result = s.intersection(t)
-    assert set([decode_docid(x) for x in result]) == set(a) & set(b)
-
-
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_ext_intersection(a, b):
-    s = BlockSkipList.from_list(a, p=2)
-    t = BlockSkipList.from_list(b, p=2)
+    print(a)
+    print(b)
+    s = BlockSkipList.from_list(a, block_size=20)
+    t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_s:
         with TemporaryFile(prefix="pysearchlite_") as file_t:
             s.write(file_s)
@@ -140,16 +128,9 @@ def test_skip_list_ext_intersection(a, b):
 
 
 @pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
-def test_skip_list_intersection_with_doc_ids(a, b):
-    t = BlockSkipList.from_list(b, p=2)
-    result = t.intersection_with_doc_ids([encode_docid(doc_id) for doc_id in a])
-    assert set([decode_docid(x) for x in result]) == set(a) & set(b)
-
-
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_ext_intersection_with_doc_ids(a, b):
     a_bin = [encode_docid(x) for x in a]
-    t = BlockSkipList.from_list(b, p=2)
+    t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_t:
         t.write(file_t)
         file_t.seek(0)

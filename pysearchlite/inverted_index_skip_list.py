@@ -151,10 +151,10 @@ class InvertedIndexBlockSkipList(InvertedIndex):
                 freq = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
                 pos = self.mmap.tell()
                 self.data[token] = (freq, LIST_TYPE_SKIP_LIST, pos)
-                p = int.from_bytes(self.mmap.read(1), sys.byteorder)
-                self.mmap.seek(1, 1)  # max_level
+                block_size = int.from_bytes(self.mmap.read(1), sys.byteorder)
+                max_level = int.from_bytes(self.mmap.read(1), sys.byteorder)
+                self.mmap.seek(SKIP_LIST_BLOCK_INDEX_BYTES * max_level, 1)
                 blocks = int.from_bytes(self.mmap.read(SKIP_LIST_BLOCK_INDEX_BYTES), sys.byteorder)
-                block_size = (p * 2 + 1) * DOCID_BYTES
                 self.mmap.seek(blocks * block_size, 1)
             else:
                 raise ValueError(f"Unsupported block type: {block_type}")
