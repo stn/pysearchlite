@@ -84,13 +84,14 @@ def write_block_skip_list(skip_list, file):
     file.write(skip_list.freq.to_bytes(DOCID_LEN_BYTES, sys.byteorder))
     file.write(skip_list.block_size.to_bytes(1, sys.byteorder))
     file.write(skip_list.max_level.to_bytes(1, sys.byteorder))
+    for i in range(1, skip_list.max_level + 1):
+        file.write(skip_list.level_block_idx[i].to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
     file.write(len(skip_list.blocks).to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
-    block_size = skip_list.block_size + SKIP_LIST_BLOCK_INDEX_BYTES
     for i, block in enumerate(skip_list.blocks):
         b = encode_block_idx(skip_list.next_block_idx[i])
         b += block
-        if len(b) < block_size:
-            b = b.ljust(block_size, b'\x00')
+        if len(b) < skip_list.block_size:
+            b = b.ljust(skip_list.block_size, b'\x00')
         file.write(b)
 
 

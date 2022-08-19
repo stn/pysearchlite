@@ -7,7 +7,7 @@ from pysearchlite import codecs
 from pysearchlite.codecs import DOCID_BYTES, BYTEORDER, SKIP_LIST_BLOCK_INDEX_BYTES, BLOCK_TYPE_DOC_ID, \
     BLOCK_TYPE_DOC_IDS_LIST, BLOCK_TYPE_SKIP_LIST, DOCID_LEN_BYTES, encode_docid, encode_block_idx, decode_block_idx
 
-SKIPLIST_BLOCK_SIZE = int(os.environ.get('PYSEARCHLITE_SKIPLIST_BLOCK_SIZE', '40'))
+SKIPLIST_BLOCK_SIZE = int(os.environ.get('PYSEARCHLITE_SKIPLIST_BLOCK_SIZE', '44'))
 SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
 
 LIST_TYPE_DOC_ID = 1
@@ -55,7 +55,7 @@ class BlockSkipList(object):
             level = 0
             block = blocks[current_block_idx[0]]
             doc_id = encode_docid(ids[i])
-            if len(block) + len(doc_id) <= block_size:
+            if len(block) + len(doc_id) + SKIP_LIST_BLOCK_INDEX_BYTES <= block_size:
                 block.extend(doc_id)
             else:
                 new_block_idx = len(blocks)
@@ -73,7 +73,7 @@ class BlockSkipList(object):
                         next_block_idx.append(0)
                         current_block_idx.append(new_block_idx)
                     skip_list_block = blocks[current_block_idx[level]]
-                    if len(skip_list_block) + len(doc_id) + SKIP_LIST_BLOCK_INDEX_BYTES <= block_size:
+                    if len(skip_list_block) + len(doc_id) + SKIP_LIST_BLOCK_INDEX_BYTES * 2 <= block_size:
                         skip_list_block.extend(doc_id)
                         skip_list_block.extend(encode_block_idx(current_block_idx[level - 1]))
                         break
@@ -95,150 +95,6 @@ class BlockSkipList(object):
         s.freq = len(ids)
         return s
 
-    def get_ids(self):
-        block_idx = 0
-        block = self.blocks[0]
-        pos = 0
-        result = array('i')
-        while True:
-            if pos == self.p:
-                block_idx = self.next_block_idx[block_idx]
-                if block_idx == 0:  # end of ids
-                    break
-                block = self.blocks[block_idx]
-                pos = 0
-            result.append(block[pos])
-            pos += 1
-        return result
-
-    def search(self, doc_id_a):
-        # Check the start position.
-        for level in range(self.max_level + 1):
-            if doc_id_a <= self.last_id[level]:
-                break
-        block_idx = self.last_block_idx[level]
-        block = self.blocks[block_idx]
-        pos = self.last_pos[level]
-        last_pos = pos
-        # When the first item is greater than the given doc id.
-        if block[pos] >= doc_id_a:
-            return block[pos]
-
-        # skip list
-        while level > 0:
-            while True:
-                pos_id = block[pos]
-                if pos_id < doc_id_a:
-                    last_pos = pos
-                    pos += 2
-                    if pos >= self.p * 2:  # reach to the end of the block
-                        next_block_idx = self.next_block_idx[block_idx]
-                        if next_block_idx == 0:  # reach to the end of this level
-                            pos = last_pos
-                            self.last_pos[level] = last_pos
-                            self.last_id[level] = pos_id
-                            break  # down the level
-                        next_block = self.blocks[next_block_idx]
-                        next_block0 = next_block[0]
-                        if next_block0 > doc_id_a:
-                            pos = last_pos
-                            self.last_pos[level] = last_pos
-                            self.last_id[level] = next_block0
-                            break  # down the level
-                        block_idx = next_block_idx
-                        block = next_block
-                        pos = 0
-                        self.last_block_idx[level] = block_idx
-                    elif pos >= len(block):  # block is shorter than 2p.
-                        pos = last_pos
-                        self.last_pos[level] = last_pos
-                        self.last_id[level] = pos_id
-                        break  # down the level
-                elif pos_id > doc_id_a:
-                    pos = last_pos
-                    self.last_pos[level] = last_pos
-                    self.last_id[level] = pos_id
-                    break  # down the level
-                else:  # pos_id == doc_id_a:
-                    self.last_pos[level] = pos
-                    self.last_id[level] = pos_id
-                    return pos_id
-            level -= 1
-            block_idx = decode_block_idx(block[pos + 1])
-            block = self.blocks[block_idx]
-            pos = 0
-            self.last_block_idx[level] = block_idx
-            self.last_pos[level] = 0
-
-        # ids
-        while True:
-            pos_id = block[pos]
-            if pos_id < doc_id_a:
-                next_pos = pos + 1
-                if next_pos >= self.p:  # reach to the end of the block
-                    next_block_idx = self.next_block_idx[block_idx]
-                    if next_block_idx == 0:  # reach to the end of id list
-                        self.last_pos[0] = pos
-                        self.last_id[0] = pos_id
-                        return pos_id
-                    block_idx = next_block_idx
-                    block = self.blocks[block_idx]
-                    pos = 0
-                    self.last_block_idx[0] = block_idx
-                elif next_pos >= len(block):
-                    self.last_pos[0] = pos
-                    self.last_id[0] = pos_id
-                    self.last_block_idx[0] = block_idx
-                    return pos_id
-                else:
-                    pos = next_pos
-            else:  # pos_id >= doc_id_a
-                self.last_pos[0] = pos
-                self.last_id[0] = pos_id
-                return pos_id
-
-    def intersection(self, b):
-        block_idx = 0
-        block = self.blocks[0]
-        pos = 0
-        b.reset()
-        result = []
-        doc_id_b = b'\x00\x00\x00\x00'
-        while True:
-            if pos == self.p:
-                block_idx = self.next_block_idx[block_idx]
-                if block_idx == 0:
-                    break
-                block = self.blocks[block_idx]
-                pos = 0
-            elif pos == len(block):  # end of ids
-                break
-            doc_id_a = block[pos]
-            if doc_id_a >= doc_id_b:
-                doc_id_b = b.search(doc_id_a)
-                if doc_id_b == doc_id_a:
-                    result.append(doc_id_a)
-                elif doc_id_b < doc_id_a:  # reached to the end of b
-                    break
-            pos += 1
-        return result
-
-    def intersection_with_doc_ids(self, a):
-        self.reset()
-        result = []
-        for doc_id_a in a:
-            doc_id_b = self.search(doc_id_a)
-            if doc_id_b == doc_id_a:
-                result.append(doc_id_a)
-            if doc_id_b < doc_id_a:  # reached to the end of b
-                break
-        return result
-
-    def reset(self):
-        self.last_block_idx = [i for i in range(self.max_level + 1)]
-        self.last_pos = [0] * (self.max_level + 1)
-        self.last_id = [b'\x00\x00\x00\x00'] * (self.max_level + 1)
-
     def write(self, file):
         codecs.write_block_skip_list(self, file)
 
@@ -247,14 +103,18 @@ class BlockSkipListExt(object):
 
     def __init__(self, mmap, pos, freq):
         self.mmap = mmap
-        self.p = int.from_bytes(mmap[pos:pos+1], sys.byteorder)
+        # block_size(1) max_level(1) level_block_idx[max_level] num_blocks
+        self.block_size = int.from_bytes(mmap[pos:pos+1], sys.byteorder)
         self.max_level = int.from_bytes(mmap[pos+1:pos+2], sys.byteorder)
-        self.offset = pos + 2 + SKIP_LIST_BLOCK_INDEX_BYTES
+        self.level_block_idx = [0]
+        for i in range(self.max_level):
+            p = pos + 2 + i * SKIP_LIST_BLOCK_INDEX_BYTES
+            self.level_block_idx.append(int.from_bytes(mmap[p:p + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder))
+        self.offset = pos + 2 + self.max_level * SKIP_LIST_BLOCK_INDEX_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES
         self.freq = freq
         self.last_block_idx = None
         self.last_pos = None
         self.last_id = None
-        self.block_size = (self.p * 2) * DOCID_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES
 
     @staticmethod
     def of(freq, list_type, mem, pos):
@@ -281,17 +141,17 @@ class BlockSkipListExt(object):
             raise ValueError(f"Unsupported block type: {block_type}")
 
     def get_ids(self):
-        block_pos = self.offset + SKIP_LIST_BLOCK_INDEX_BYTES
-        pos = 0
+        block_pos = self.offset
+        pos = SKIP_LIST_BLOCK_INDEX_BYTES
         result = []
         while True:
-            if pos == self.p * DOCID_BYTES:
+            if pos >= self.block_size:
                 #block = self.blocks[block[pos]]
-                block_idx = decode_block_idx(self.mmap[block_pos - SKIP_LIST_BLOCK_INDEX_BYTES:block_pos])
+                block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
                 if block_idx == 0:
                     break
-                block_pos = self.offset + self.block_size * block_idx + SKIP_LIST_BLOCK_INDEX_BYTES
-                pos = 0
+                block_pos = self.offset + self.block_size * block_idx
+                pos = SKIP_LIST_BLOCK_INDEX_BYTES
             #doc_id_a = block[pos]
             doc_id_a = self.mmap[block_pos + pos:block_pos + pos + DOCID_BYTES]
             if doc_id_a == b'\x00\x00\x00\x00':
@@ -307,7 +167,7 @@ class BlockSkipListExt(object):
                 break
         block_idx = self.last_block_idx[level]
         #block = self.blocks[block_idx]
-        block_pos = self.offset + self.block_size * block_idx + SKIP_LIST_BLOCK_INDEX_BYTES
+        block_pos = self.offset + self.block_size * block_idx
         pos = self.last_pos[level]
         last_pos = pos
         # When the first item is greater than the given doc id.
@@ -322,17 +182,17 @@ class BlockSkipListExt(object):
                 if pos_id < doc_id_a:
                     last_pos = pos
                     pos += DOCID_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES
-                    if pos >= self.block_size - SKIP_LIST_BLOCK_INDEX_BYTES:  # reached to the end of the block
-                        next_block_idx = decode_block_idx(self.mmap[block_pos - SKIP_LIST_BLOCK_INDEX_BYTES:block_pos])
+                    if pos >= self.block_size:  # reached to the end of the block
+                        next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
                         if next_block_idx == 0:  # reached to the end of the block
                             pos = last_pos
                             self.last_pos[level] = last_pos
                             self.last_id[level] = pos_id
                             break  # down the level
                         #next_block = self.blocks[next_block_idx]
-                        next_block_pos = self.offset + self.block_size * next_block_idx + SKIP_LIST_BLOCK_INDEX_BYTES
+                        next_block_pos = self.offset + self.block_size * next_block_idx
                         #next_block0 = next_block[0]
-                        next_block0 = self.mmap[next_block_pos:next_block_pos+DOCID_BYTES]
+                        next_block0 = self.mmap[next_block_pos + SKIP_LIST_BLOCK_INDEX_BYTES:next_block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + DOCID_BYTES]
                         if next_block0 > doc_id_a:
                             pos = last_pos
                             self.last_pos[level] = last_pos
@@ -341,7 +201,7 @@ class BlockSkipListExt(object):
                         #block = next_block
                         block_idx = next_block_idx
                         block_pos = next_block_pos
-                        pos = 0
+                        pos = SKIP_LIST_BLOCK_INDEX_BYTES
                         self.last_block_idx[level] = block_idx
                     elif self.mmap[block_pos + pos: block_pos + pos + DOCID_BYTES] == b'\x00\x00\x00\x00':  # reach to the end of this level
                         pos = last_pos
@@ -362,9 +222,9 @@ class BlockSkipListExt(object):
             block_idx = decode_block_idx(self.mmap[block_pos + pos + DOCID_BYTES:block_pos + pos + DOCID_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES])
             self.last_block_idx[level] = block_idx
             #block = self.blocks[block[pos + 1]]
-            block_pos = self.offset + self.block_size * block_idx + SKIP_LIST_BLOCK_INDEX_BYTES
-            self.last_pos[level] = 0
-            pos = 0
+            block_pos = self.offset + self.block_size * block_idx
+            self.last_pos[level] = SKIP_LIST_BLOCK_INDEX_BYTES
+            pos = SKIP_LIST_BLOCK_INDEX_BYTES
 
         # ids
         while True:
@@ -372,18 +232,18 @@ class BlockSkipListExt(object):
             pos_id = self.mmap[block_pos + pos: block_pos + pos + DOCID_BYTES]
             if pos_id < doc_id_a:
                 next_pos = pos + DOCID_BYTES
-                if next_pos >= self.p * DOCID_BYTES:  # reach to the end of the block
+                if next_pos >= self.block_size:  # reach to the end of the block
                     #next_block_idx = block[next_pos]
-                    next_block_idx = decode_block_idx(self.mmap[block_pos - SKIP_LIST_BLOCK_INDEX_BYTES:block_pos])
+                    next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
                     if next_block_idx == 0:  # reached to the end of id list
                         pos = last_pos
                         self.last_pos[0] = pos
                         self.last_id[0] = pos_id
                         return pos_id
                     #block = self.blocks[next_block_idx]
-                    block_pos = self.offset + self.block_size * next_block_idx + SKIP_LIST_BLOCK_INDEX_BYTES
+                    block_pos = self.offset + self.block_size * next_block_idx
                     self.last_block_idx[0] = next_block_idx
-                    pos = 0
+                    pos = SKIP_LIST_BLOCK_INDEX_BYTES
                 elif self.mmap[block_pos + next_pos: block_pos + next_pos + DOCID_BYTES] == b'\x00\x00\x00\x00':  # reach to the end of this level
                     self.last_pos[0] = pos
                     self.last_id[0] = pos_id
@@ -397,19 +257,19 @@ class BlockSkipListExt(object):
 
     def intersection(self, b):
         #block = self.blocks[0]
-        block_pos = self.offset + SKIP_LIST_BLOCK_INDEX_BYTES
-        pos = 0
+        block_pos = self.offset
+        pos = SKIP_LIST_BLOCK_INDEX_BYTES
         b.reset()
         result = []
         doc_id_b = b'\x00\x00\x00\x00'
         while True:
-            if pos == self.p * DOCID_BYTES:
+            if pos >= self.block_size:
                 #block = self.blocks[block[pos]]
-                block_idx = decode_block_idx(self.mmap[block_pos - SKIP_LIST_BLOCK_INDEX_BYTES:block_pos])
+                block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
                 if block_idx == 0:
                     break
-                block_pos = self.offset + self.block_size * block_idx + SKIP_LIST_BLOCK_INDEX_BYTES
-                pos = 0
+                block_pos = self.offset + self.block_size * block_idx
+                pos = SKIP_LIST_BLOCK_INDEX_BYTES
             #doc_id_a = block[pos]
             doc_id_a = self.mmap[block_pos + pos:block_pos + pos + DOCID_BYTES]
             if doc_id_a == b'\x00\x00\x00\x00':
@@ -437,8 +297,8 @@ class BlockSkipListExt(object):
         return result
 
     def reset(self):
-        self.last_block_idx = [i for i in range(self.max_level + 1)]
-        self.last_pos = [0] * (self.max_level + 1)
+        self.last_block_idx = [self.level_block_idx[i] for i in range(self.max_level + 1)]
+        self.last_pos = [SKIP_LIST_BLOCK_INDEX_BYTES] * (self.max_level + 1)
         self.last_id = [b'\x00\x00\x00\x00'] * (self.max_level + 1)
 
 
