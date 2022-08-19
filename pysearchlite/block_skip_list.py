@@ -7,7 +7,7 @@ from pysearchlite import codecs
 from pysearchlite.codecs import DOCID_BYTES, BYTEORDER, SKIP_LIST_BLOCK_INDEX_BYTES, BLOCK_TYPE_DOC_ID, \
     BLOCK_TYPE_DOC_IDS_LIST, BLOCK_TYPE_SKIP_LIST, DOCID_LEN_BYTES, encode_docid, encode_block_idx, decode_block_idx
 
-SKIPLIST_P = int(os.environ.get('PYSEARCHLITE_SKIPLIST_P', '8'))
+SKIPLIST_BLOCK_SIZE = int(os.environ.get('PYSEARCHLITE_SKIPLIST_BLOCK_SIZE', '40'))
 SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
 
 LIST_TYPE_DOC_ID = 1
@@ -18,66 +18,79 @@ LIST_TYPE_SKIP_LIST = 3
 class BlockSkipList(object):
 
     def __init__(self):
-        self.p = SKIPLIST_P
+        self.block_size = SKIPLIST_BLOCK_SIZE
         self.max_level = 0
         self.blocks = None
         self.next_block_idx = None
+        self.level_block_idx = None
         self.freq = 0
         self.last_block_idx = None
         self.last_pos = None
         self.last_id = None
 
     @staticmethod
-    def from_list(ids, p=SKIPLIST_P, max_level=SKIPLIST_MAX_LEVEL):
+    def from_list(ids, block_size=SKIPLIST_BLOCK_SIZE, max_level=SKIPLIST_MAX_LEVEL):
         if len(ids) == 1:
             return SingleDocId(ids[0])
-        elif len(ids) <= p:
-            return DocIdList(ids)
+        #elif len(ids) <= p:
+        #    return DocIdList(ids)
 
-        max_level = min(int(math.log(max(len(ids) - 1, 1), p)), max_level)
+        #max_level = min(int(math.log(max(len(ids) - 1, 1), p)), max_level)
 
         # Start from the fist element.
         doc_id = encode_docid(ids[0])
-        blocks = [[doc_id]]
+        blocks = [bytearray(doc_id)]
         next_block_idx = [0]
-        # Prepare the first block of each level.
-        for i in range(0, max_level):
-            # the first value and the index of one level down block
-            blocks.append([doc_id, encode_block_idx(i)])
-            next_block_idx.append(0)
+        ## Prepare the first block of each level.
+        #for i in range(0, max_level):
+        #    # the first value and the index of one level down block
+        #    blocks.append([doc_id, encode_block_idx(i)])
+        #    next_block_idx.append(0)
 
-        current_block = [i for i in range(max_level + 1)]
+        #current_block = [i for i in range(max_level + 1)]
+        current_block_idx = [0]
+        level_block_idx = [0]
 
         for i in range(1, len(ids)):
             level = 0
-            block = blocks[current_block[0]]
+            block = blocks[current_block_idx[0]]
             doc_id = encode_docid(ids[i])
-            if len(block) < p:
-                block.append(doc_id)
+            if len(block) + len(doc_id) <= block_size:
+                block.extend(doc_id)
             else:
-                new_block = len(blocks)
-                next_block_idx[current_block[0]] = new_block
-                blocks.append([doc_id])  # new block
+                new_block_idx = len(blocks)
+                next_block_idx[current_block_idx[0]] = new_block_idx
+                blocks.append(bytearray(doc_id))  # new block
                 next_block_idx.append(0)
-                current_block[0] = new_block
+                current_block_idx[0] = new_block_idx
                 # skip list
                 while level < max_level:
                     level += 1
-                    skip_list_block = blocks[current_block[level]]
-                    if len(skip_list_block) < p * 2:
-                        skip_list_block.append(doc_id)
-                        skip_list_block.append(encode_block_idx(current_block[level - 1]))
+                    if len(current_block_idx) <= level:
+                        new_block_idx = len(blocks)
+                        blocks.append(bytearray(encode_docid(ids[0]) + encode_block_idx(level_block_idx[level - 1])))
+                        level_block_idx.append(new_block_idx)
+                        next_block_idx.append(0)
+                        current_block_idx.append(new_block_idx)
+                    skip_list_block = blocks[current_block_idx[level]]
+                    if len(skip_list_block) + len(doc_id) + SKIP_LIST_BLOCK_INDEX_BYTES <= block_size:
+                        skip_list_block.extend(doc_id)
+                        skip_list_block.extend(encode_block_idx(current_block_idx[level - 1]))
                         break
-                    new_block = len(blocks)
-                    next_block_idx[current_block[level]] = new_block
-                    blocks.append([doc_id, encode_block_idx(current_block[level - 1])])  # new block
+                    new_block_idx = len(blocks)
+                    next_block_idx[current_block_idx[level]] = new_block_idx
+                    blocks.append(bytearray(doc_id + encode_block_idx(current_block_idx[level - 1])))  # new block
                     next_block_idx.append(0)
-                    current_block[level] = new_block
+                    current_block_idx[level] = new_block_idx
+
+        if len(level_block_idx) == 1:
+            return DocIdList(ids)
 
         s = BlockSkipList()
-        s.p = p
-        s.max_level = max_level
+        s.block_size = block_size
+        s.max_level = len(level_block_idx) - 1
         s.blocks = blocks
+        s.level_block_idx = level_block_idx
         s.next_block_idx = next_block_idx
         s.freq = len(ids)
         return s
