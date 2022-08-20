@@ -107,10 +107,9 @@ def test_inverted_restore(inverted_index):
 
 
 def test_inverted_get(inverted_index):
-    with open(os.path.join(inverted_index.idx_dir, 'inverted_index'), 'wb') as f:
-        f.write(B_INT16_1 + b'a' + b'\x01' + B_INT32_2_B +
-                B_INT16_1 + b'b' + b'\x01' + B_INT32_1_B +
-                B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + B_INT32_1_B + B_INT32_2_B)
+    inverted_index.add(1, ['c', 'b'])
+    inverted_index.add(2, ['a', 'c'])
+    inverted_index.save()
     inverted_index.restore()
     assert inverted_index.get('a') == [B_INT32_2_B]
     assert inverted_index.get('b') == [B_INT32_1_B]
@@ -119,10 +118,9 @@ def test_inverted_get(inverted_index):
 
 
 def test_inverted_search_and(inverted_index):
-    with open(os.path.join(inverted_index.idx_dir, 'inverted_index'), 'wb') as f:
-        f.write(B_INT16_1 + b'a' + b'\x01' + B_INT32_2_B +
-                B_INT16_1 + b'b' + b'\x01' + B_INT32_1_B +
-                B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + B_INT32_1_B + B_INT32_2_B)
+    inverted_index.add(1, ['c', 'b'])
+    inverted_index.add(2, ['a', 'c'])
+    inverted_index.save()
     inverted_index.restore()
     assert inverted_index.search_and(['a', 'b']) == []
     assert inverted_index.search_and(['a', 'c']) == [B_INT32_2_B]
@@ -133,10 +131,9 @@ def test_inverted_search_and(inverted_index):
 
 
 def test_inverted_count_and(inverted_index):
-    with open(os.path.join(inverted_index.idx_dir, 'inverted_index'), 'wb') as f:
-        f.write(B_INT16_1 + b'a' + b'\x01' + B_INT32_2_B +
-                B_INT16_1 + b'b' + b'\x01' + B_INT32_1_B +
-                B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + B_INT32_1_B + B_INT32_2_B)
+    inverted_index.add(1, ['c', 'b'])
+    inverted_index.add(2, ['a', 'c'])
+    inverted_index.save()
     inverted_index.restore()
     assert inverted_index.count_and(['a', 'b']) == 0
     assert inverted_index.count_and(['a', 'c']) == 1

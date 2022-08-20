@@ -5,7 +5,7 @@ from tempfile import TemporaryFile
 import pytest as pytest
 
 from .block_skip_list import BlockSkipList, SingleDocId, DocIdList, BlockSkipListExt
-from .codecs import encode_docid, decode_docid
+from .codecs import encode_docid, decode_docid, DOCID_BYTES
 
 B_0 = b'\x00\x00\x00\x00'
 B_1 = b'\x00\x00\x00\x01'
@@ -79,19 +79,22 @@ def test_block_skip_list_fromlist():
 
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
 def test_block_skip_list_ext_search(arr, target):
-    skip_list = BlockSkipList.from_list(arr, block_size=16)
+    # prepare skip_list_ext
+    skip_list = BlockSkipList.from_list(arr, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file:
         skip_list.write(file)
         file.seek(0)
         mem = mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ)
         skip_list_ext = BlockSkipListExt.read(mem)
         skip_list_ext.reset()
-        ret = skip_list_ext.search(encode_docid(target))
+        # prepare target
+        mem_target = bytearray(encode_docid(target))
+        ret, cmp = skip_list_ext.search(mem_target, 0)
         i = linear_search(arr, target)
         if i == len(arr):
-            assert decode_docid(ret) == arr[-1]
+            assert decode_docid(mem[ret:ret + DOCID_BYTES]) == arr[-1]
         else:
-            assert decode_docid(ret) == arr[i]
+            assert decode_docid(mem[ret:ret + DOCID_BYTES]) == arr[i]
 
 
 def skip_list_and_test_cases(num, max_len):
@@ -109,8 +112,6 @@ def skip_list_and_test_cases(num, max_len):
 
 @pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_ext_intersection(a, b):
-    print(a)
-    print(b)
     s = BlockSkipList.from_list(a, block_size=20)
     t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_s:
@@ -124,17 +125,18 @@ def test_skip_list_ext_intersection(a, b):
             mem_t = mmap.mmap(file_t.fileno(), length=0, access=mmap.ACCESS_READ)
             t_ext = BlockSkipListExt.read(mem_t)
             result = s_ext.intersection(t_ext)
-            assert set([decode_docid(x) for x in result]) == set(a) & set(b)
+            assert set([decode_docid(mem_s[x:x+DOCID_BYTES]) for x in result]) == set(a) & set(b)
 
 
 @pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
 def test_skip_list_ext_intersection_with_doc_ids(a, b):
-    a_bin = [encode_docid(x) for x in a]
+    mem_a = b''.join([encode_docid(x) for x in a])
+    list_pos_a = [i * DOCID_BYTES for i in range(len(a))]
     t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_t:
         t.write(file_t)
         file_t.seek(0)
         mem_t = mmap.mmap(file_t.fileno(), length=0, access=mmap.ACCESS_READ)
         t_ext = BlockSkipListExt.read(mem_t)
-        result = t_ext.intersection_with_doc_ids(a_bin)
-    assert set([decode_docid(x) for x in result]) == set(a) & set(b)
+        result = t_ext.intersection_with_doc_ids(mem_a, list_pos_a)
+    assert set([decode_docid(mem_a[x:x+DOCID_BYTES]) for x in result]) == set(a) & set(b)

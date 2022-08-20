@@ -39,6 +39,38 @@ def decode_docid(doc_id):
     return int.from_bytes(doc_id, "big")
 
 
+def compare_docid(mem_a, pos_a, mem_b, pos_b):
+    a0 = mem_a[pos_a]
+    b0 = mem_b[pos_b]
+    if a0 < b0:
+        return -1
+    elif a0 > b0:
+        return 1
+    a1 = mem_a[pos_a + 1]
+    b1 = mem_b[pos_b + 1]
+    if a1 < b1:
+        return -1
+    elif a1 > b1:
+        return 1
+    a2 = mem_a[pos_a + 2]
+    b2 = mem_b[pos_b + 2]
+    if a2 < b2:
+        return -1
+    elif a2 > b2:
+        return 1
+    a3 = mem_a[pos_a + 3]
+    b3 = mem_b[pos_b + 3]
+    if a3 < b3:
+        return -1
+    elif a3 > b3:
+        return 1
+    return 0
+
+
+def is_zero_docid(mem_a, pos_a):
+    return mem_a[pos_a] == 0 and mem_a[pos_a + 1] == 0 and mem_a[pos_a + 2] == 0 and mem_a[pos_a + 3] == 0
+
+
 def encode_block_idx(idx):
     return idx.to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder)
 

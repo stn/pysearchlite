@@ -140,8 +140,9 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         while token:
             block_type = self.mmap.read(1)
             if block_type == BLOCK_TYPE_DOC_ID:
-                doc_id = self.mmap.read(DOCID_BYTES)
-                self.data[token] = (1, LIST_TYPE_DOC_ID, doc_id)
+                pos = self.mmap.tell()
+                self.mmap.seek(DOCID_BYTES, 1)
+                self.data[token] = (1, LIST_TYPE_DOC_ID, pos)
             elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
                 ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
                 pos = self.mmap.tell()
@@ -165,11 +166,13 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         if freq == 0:
             return []
         elif freq == 1:
-            return [pos]
+            return [self.mmap[pos:pos+DOCID_BYTES]]
         elif list_type == LIST_TYPE_DOC_IDS_LIST:
-            return DocIdListExt(self.mmap, pos, freq).get_ids()
+            list_pos = DocIdListExt(self.mmap, pos, freq).get_ids()
+            return [self.mmap[pos:pos+DOCID_BYTES] for pos in list_pos]
         elif list_type == LIST_TYPE_SKIP_LIST:
-            return BlockSkipListExt(self.mmap, pos, freq).get_ids()
+            list_pos = BlockSkipListExt(self.mmap, pos, freq).get_ids()
+            return [self.mmap[pos:pos+DOCID_BYTES] for pos in list_pos]
 
     def prepare_state(self, tokens):
         # confirm if all tokens are in index.
@@ -194,12 +197,12 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         freq_b, list_type_b, pos_b = state[1]
         list_a = BlockSkipListExt.of(freq_a, list_type_a, self.mmap, pos_a)
         list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-        doc_ids_a = list_a.intersection(list_b)
+        list_pos_a = list_a.intersection(list_b)
         # find common doc ids
         for i, (freq_b, list_type_b, pos_b) in enumerate(state[2:]):
             list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-            doc_ids_a = list_b.intersection_with_doc_ids(doc_ids_a)
-        return doc_ids_a
+            list_pos_a = list_b.intersection_with_doc_ids(self.mmap, list_pos_a)
+        return [self.mmap[pos:pos+DOCID_BYTES] for pos in list_pos_a]
 
     def count_and(self, tokens):
         if len(tokens) == 1:
@@ -214,12 +217,12 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         freq_b, list_type_b, pos_b = state[1]
         list_a = BlockSkipListExt.of(freq_a, list_type_a, self.mmap, pos_a)
         list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-        doc_ids_a = list_a.intersection(list_b)
+        list_pos_a = list_a.intersection(list_b)
         # find common doc ids
         for freq_b, list_type_b, pos_b in state[2:]:
             list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-            doc_ids_a = list_b.intersection_with_doc_ids(doc_ids_a)
-        return len(doc_ids_a)
+            list_pos_a = list_b.intersection_with_doc_ids(self.mmap, list_pos_a)
+        return len(list_pos_a)
 
     def clear(self):
         self.raw_data = {}
