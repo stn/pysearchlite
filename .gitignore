@@ -131,6 +131,9 @@ dmypy.json
 # Idea
 .idea
 
+# Visual Studio Code
+.vscode
+
 # Corpus
 corpus*.json
 
