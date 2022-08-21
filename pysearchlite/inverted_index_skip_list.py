@@ -6,8 +6,10 @@ from operator import itemgetter
 
 from .block_skip_list import BlockSkipList, DocIdListExt, BlockSkipListExt, LIST_TYPE_DOC_ID, LIST_TYPE_DOC_IDS_LIST, \
     LIST_TYPE_SKIP_LIST
-from .codecs import read_token, write_token, copy_ids, write_doc_ids, merge_ids, read_doc_ids, BLOCK_TYPE_DOC_ID, \
-    DOCID_BYTES, BYTEORDER, BLOCK_TYPE_DOC_IDS_LIST, DOCID_LEN_BYTES, BLOCK_TYPE_SKIP_LIST, SKIP_LIST_BLOCK_INDEX_BYTES
+from .gamma_codecs import read_token, write_token, copy_ids, write_doc_ids, merge_ids, read_doc_ids, BLOCK_TYPE_DOC_ID, \
+    DOCID_BYTES, BLOCK_TYPE_DOC_IDS_LIST, DOCID_LEN_BYTES, BLOCK_TYPE_SKIP_LIST, SKIP_LIST_BLOCK_INDEX_BYTES, \
+    decode_docid
+from .gamma_codecs import docid_bytes
 from .inverted_index import InvertedIndex
 
 
@@ -141,13 +143,15 @@ class InvertedIndexBlockSkipList(InvertedIndex):
             block_type = self.mmap.read(1)
             if block_type == BLOCK_TYPE_DOC_ID:
                 pos = self.mmap.tell()
-                self.mmap.seek(DOCID_BYTES, 1)
                 self.data[token] = (1, LIST_TYPE_DOC_ID, pos)
+                self.mmap.seek(docid_bytes(self.mmap, pos), 1)
             elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
                 ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
                 pos = self.mmap.tell()
                 self.data[token] = (ids_len, LIST_TYPE_DOC_IDS_LIST, pos)
-                self.mmap.seek(ids_len * DOCID_BYTES, 1)
+                for i in range(ids_len):
+                    pos += docid_bytes(self.mmap, pos)
+                self.mmap.seek(pos)
             elif block_type == BLOCK_TYPE_SKIP_LIST:
                 freq = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
                 pos = self.mmap.tell()
@@ -166,13 +170,13 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         if freq == 0:
             return []
         elif freq == 1:
-            return [self.mmap[pos:pos+DOCID_BYTES]]
+            return [decode_docid(self.mmap, pos)]
         elif list_type == LIST_TYPE_DOC_IDS_LIST:
             list_pos = DocIdListExt(self.mmap, pos, freq).get_ids()
-            return [self.mmap[pos:pos+DOCID_BYTES] for pos in list_pos]
+            return [decode_docid(self.mmap, pos) for pos in list_pos]
         elif list_type == LIST_TYPE_SKIP_LIST:
             list_pos = BlockSkipListExt(self.mmap, pos, freq).get_ids()
-            return [self.mmap[pos:pos+DOCID_BYTES] for pos in list_pos]
+            return [decode_docid(self.mmap, pos) for pos in list_pos]
 
     def prepare_state(self, tokens):
         # confirm if all tokens are in index.
@@ -202,7 +206,7 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         for i, (freq_b, list_type_b, pos_b) in enumerate(state[2:]):
             list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
             list_pos_a = list_b.intersection_with_doc_ids(self.mmap, list_pos_a)
-        return [self.mmap[pos:pos+DOCID_BYTES] for pos in list_pos_a]
+        return [decode_docid(self.mmap, pos) for pos in list_pos_a]
 
     def count_and(self, tokens):
         if len(tokens) == 1:

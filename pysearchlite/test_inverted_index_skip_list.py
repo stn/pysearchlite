@@ -13,8 +13,8 @@ from .inverted_index_skip_list import (
 
 
 # Big endian
-B_INT16_1 = b'\x00\x01'
-B_INT16_5 = b'\x00\x05'
+B_INT16_1 = b'\x01\x00'
+B_INT16_5 = b'\x05\x00'
 
 B_INT32_0_B = b'\x00\x00\x00\x00'
 B_INT32_1_B = b'\x00\x00\x00\x01'
@@ -69,7 +69,7 @@ def test_inverted_read_token(inverted_index):
 def test_write_doc_ids(inverted_index):
     f = io.BytesIO()
     write_doc_ids(f, [1, 2, 5])
-    assert f.getvalue() == B_INT32_3_B + B_INT32_1_B + B_INT32_2_B + B_INT32_5_B
+    assert f.getvalue() == B_INT32_3_L + B_INT32_1_B + B_INT32_2_B + B_INT32_5_B
 
 
 def test_save_raw_data(inverted_index):
@@ -78,9 +78,9 @@ def test_save_raw_data(inverted_index):
     inverted_index.save_raw_data()
     with open(inverted_index.tmp_index_name(0), 'rb') as f:
         tmp_index = f.read()
-        assert tmp_index == (B_INT16_1 + b'a' + B_INT32_1_B + B_INT32_2_B +
-                             B_INT16_1 + b'b' + B_INT32_1_B + B_INT32_1_B +
-                             B_INT16_1 + b'c' + B_INT32_2_B + B_INT32_1_B + B_INT32_2_B)
+        assert tmp_index == (B_INT16_1 + b'a' + B_INT32_1_L + B_INT32_2_B +
+                             B_INT16_1 + b'b' + B_INT32_1_L + B_INT32_1_B +
+                             B_INT16_1 + b'c' + B_INT32_2_L + B_INT32_1_B + B_INT32_2_B)
     assert inverted_index.raw_data == {}
     assert inverted_index.raw_data_size == 0
     assert inverted_index.tmp_index_num == 1
@@ -92,16 +92,16 @@ def test_inverted_save(inverted_index):
     inverted_index.save()
     with open(os.path.join(inverted_index.idx_dir, 'inverted_index'), 'rb') as f:
         tmp_index = f.read()
-        assert tmp_index == (B_INT16_1 + b'a' + b'\x01' + B_INT32_2_B +
-                             B_INT16_1 + b'b' + b'\x01' + B_INT32_1_B +
-                             B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + B_INT32_1_B + B_INT32_2_B)
+        assert tmp_index == (B_INT16_1 + b'a' + b'\x01' + b'\x02' +
+                             B_INT16_1 + b'b' + b'\x01' + b'\x01' +
+                             B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + b'\x01' + b'\x02')
 
 
 def test_inverted_restore(inverted_index):
     with open(os.path.join(inverted_index.idx_dir, 'inverted_index'), 'wb') as f:
-        f.write(B_INT16_1 + b'a' + b'\x01' + B_INT32_2_B +
-                B_INT16_1 + b'b' + b'\x01' + B_INT32_1_B +
-                B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + B_INT32_1_B + B_INT32_2_B)
+        f.write(B_INT16_1 + b'a' + b'\x01' + b'\x02' +
+                B_INT16_1 + b'b' + b'\x01' + b'\x01' +
+                B_INT16_1 + b'c' + b'\x02' + B_INT32_2_L + b'\x01' + b'\x02')
     inverted_index.restore()
     #assert inverted_index.data == {'a': [1], 'b': [0], 'c': [0, 1]}
 
@@ -111,9 +111,9 @@ def test_inverted_get(inverted_index):
     inverted_index.add(2, ['a', 'c'])
     inverted_index.save()
     inverted_index.restore()
-    assert inverted_index.get('a') == [B_INT32_2_B]
-    assert inverted_index.get('b') == [B_INT32_1_B]
-    assert inverted_index.get('c') == [B_INT32_1_B, B_INT32_2_B]
+    assert inverted_index.get('a') == [2]
+    assert inverted_index.get('b') == [1]
+    assert inverted_index.get('c') == [1, 2]
     assert inverted_index.get('d') == []
 
 
@@ -123,9 +123,9 @@ def test_inverted_search_and(inverted_index):
     inverted_index.save()
     inverted_index.restore()
     assert inverted_index.search_and(['a', 'b']) == []
-    assert inverted_index.search_and(['a', 'c']) == [B_INT32_2_B]
+    assert inverted_index.search_and(['a', 'c']) == [2]
     assert inverted_index.search_and(['a', 'd']) == []
-    assert inverted_index.search_and(['b', 'c']) == [B_INT32_1_B]
+    assert inverted_index.search_and(['b', 'c']) == [1]
     assert inverted_index.search_and(['b', 'd']) == []
     assert inverted_index.search_and(['a', 'b', 'c']) == []
 

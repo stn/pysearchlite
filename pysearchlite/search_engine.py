@@ -53,7 +53,7 @@ def search(query):
         doc_ids = INVERTED_INDEX.get(query_tokens[0])
     else:
         doc_ids = INVERTED_INDEX.search_and(query_tokens)
-    return [DOC_LIST.get(int.from_bytes(doc_id, BYTEORDER)) for doc_id in doc_ids]
+    return [DOC_LIST.get(doc_id) for doc_id in doc_ids]
 
 
 def count(query):
