@@ -3,7 +3,7 @@ import sys
 
 from pysearchlite.gamma_codecs import SKIP_LIST_BLOCK_INDEX_BYTES, BLOCK_TYPE_DOC_ID, \
     BLOCK_TYPE_DOC_IDS_LIST, BLOCK_TYPE_SKIP_LIST, DOCID_LEN_BYTES, encode_docid, encode_block_idx, decode_block_idx, \
-    compare_docid, is_zero_docid, write_single_doc_id, docid_bytes, write_doc_ids_list, write_block_skip_list
+    compare_docid, is_zero_docid, write_single_doc_id, bytes_docid, write_doc_ids_list, write_block_skip_list
 
 SKIPLIST_BLOCK_SIZE = int(os.environ.get('PYSEARCHLITE_SKIPLIST_BLOCK_SIZE', '44'))
 SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
@@ -167,7 +167,7 @@ class BlockSkipListExt(object):
             if is_zero_docid(self.mmap, pos_a):
                 break
             result.append(pos_a)
-            pos += docid_bytes(self.mmap, pos_a)
+            pos += bytes_docid(self.mmap, pos_a)
             i += 1
         return result
 
@@ -202,7 +202,7 @@ class BlockSkipListExt(object):
                 if cmp < 0:
                     last_pos = pos
                     last_i = i
-                    pos += docid_bytes(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
+                    pos += bytes_docid(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
                     i += 1
                     if i >= freq or is_zero_docid(self.mmap, pos):  # reached to the end of the block
                         next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
@@ -246,7 +246,7 @@ class BlockSkipListExt(object):
                     #self.last_id[level] = pos_id
                     return pos, cmp
             level -= 1
-            pos += docid_bytes(self.mmap, pos)
+            pos += bytes_docid(self.mmap, pos)
             block_idx = decode_block_idx(self.mmap[pos:pos + SKIP_LIST_BLOCK_INDEX_BYTES])
             block_pos = self.offset + self.block_size * block_idx
             pos = block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + 1
@@ -262,7 +262,7 @@ class BlockSkipListExt(object):
             #if pos_id < doc_id_a:
             cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
             if cmp < 0:
-                next_pos = pos + docid_bytes(self.mmap, pos)
+                next_pos = pos + bytes_docid(self.mmap, pos)
                 i += 1
                 if i >= freq or is_zero_docid(self.mmap, next_pos):  # reach to the end of the block
                     next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
@@ -311,7 +311,7 @@ class BlockSkipListExt(object):
             #elif doc_id_b < doc_id_a:  # reached to the end of b
             elif cmp < 0:  # reached to the end of b
                 break
-            pos += docid_bytes(self.mmap, pos)
+            pos += bytes_docid(self.mmap, pos)
             i += 1
         return result
 
@@ -361,7 +361,7 @@ class DocIdListExt(object):
         result = []
         for i in range(self.freq):
             result.append(pos)
-            pos += docid_bytes(self.mmap, pos)
+            pos += bytes_docid(self.mmap, pos)
         return result
 
     def search(self, mem_a, pos_a):
@@ -376,7 +376,7 @@ class DocIdListExt(object):
             i += 1
             if i >= self.freq:
                 break
-            pos += docid_bytes(self.mmap, pos)
+            pos += bytes_docid(self.mmap, pos)
         return pos, cmp
 
     def intersection(self, b):
@@ -389,7 +389,7 @@ class DocIdListExt(object):
             pos_b, cmp = b.search(self.mmap, pos)
             if cmp == 0:
                 result.append(pos)
-            pos += docid_bytes(self.mmap, pos)
+            pos += bytes_docid(self.mmap, pos)
         return result
 
     def intersection_with_doc_ids(self, mem_a, list_pos_a):

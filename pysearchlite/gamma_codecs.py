@@ -44,47 +44,47 @@ def read_token(f):
     return f.read(token_len).decode('utf-8')
 
 
-def encode_docid(doc_id):
+def gamma_encoding(x):
     """Elias gamma encoding addressing in bytes"""
-    if doc_id <= VAR_ENCODE_MAX1:
-        return VAR_ENCODE_TABLE1[doc_id]  # 0xxxxxxx
-    elif doc_id <= VAR_ENCODE_MAX2:
-        b1 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b2 = VAR_ENCODE_TABLE2[doc_id]  # 6 bits 10xxxxxx
+    if x <= VAR_ENCODE_MAX1:
+        return VAR_ENCODE_TABLE1[x]  # 0xxxxxxx
+    elif x <= VAR_ENCODE_MAX2:
+        b1 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b2 = VAR_ENCODE_TABLE2[x]  # 6 bits 10xxxxxx
         return b2 + b1
-    elif doc_id <= VAR_ENCODE_MAX3:
-        b1 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b2 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b3 = VAR_ENCODE_TABLE3[doc_id]  # 5 bits 110xxxxx
+    elif x <= VAR_ENCODE_MAX3:
+        b1 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b2 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b3 = VAR_ENCODE_TABLE3[x]  # 5 bits 110xxxxx
         return b3 + b2 + b1
-    elif doc_id <= VAR_ENCODE_MAX4:
-        b1 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b2 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b3 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b4 = VAR_ENCODE_TABLE4[doc_id]  # 4 bits 1110xxxx
+    elif x <= VAR_ENCODE_MAX4:
+        b1 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b2 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b3 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b4 = VAR_ENCODE_TABLE4[x]  # 4 bits 1110xxxx
         return b4 + b3 + b2 + b1
-    elif doc_id <= VAR_ENCODE_MAX5:
-        b1 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b2 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b3 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b4 = VAR_ENCODE_TABLE1[doc_id & 127]  # low 7 bits 0xxxxxxx
-        doc_id = doc_id >> 7
-        b5 = VAR_ENCODE_TABLE5[doc_id]  # 3 bits 11110xxx
+    elif x <= VAR_ENCODE_MAX5:
+        b1 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b2 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b3 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b4 = VAR_ENCODE_TABLE1[x & 127]  # low 7 bits 0xxxxxxx
+        x = x >> 7
+        b5 = VAR_ENCODE_TABLE5[x]  # 3 bits 11110xxx
         return b5 + b4 + b3 + b2 + b1
     else:
         raise ValueError
 
 
-def decode_docid(mem, pos):
+def decode_gamma(mem, pos):
     b1 = mem[pos]
     if b1 < 128:
         return b1
@@ -100,11 +100,11 @@ def decode_docid(mem, pos):
         raise ValueError
 
 
-def docid_bytes(mem, pos):
+def bytes_gamma(mem, pos):
     return VAR_ENCODE_BYTES[mem[pos]]
 
 
-def compare_docid(mem_a, pos_a, mem_b, pos_b):
+def compare_gamma(mem_a, pos_a, mem_b, pos_b):
     a0 = mem_a[pos_a]
     b0 = mem_b[pos_b]
     if a0 < b0:
@@ -149,6 +149,22 @@ def compare_docid(mem_a, pos_a, mem_b, pos_b):
         return 1
 
     return 0
+
+
+def encode_docid(doc_id):
+    return gamma_encoding(doc_id)
+
+
+def decode_docid(mem, pos):
+    return decode_gamma(mem, pos)
+
+
+def bytes_docid(mem, pos):
+    return bytes_gamma(mem, pos)
+
+
+def compare_docid(mem_a, pos_a, mem_b, pos_b):
+    return compare_gamma(mem_a, pos_a, mem_b, pos_b)
 
 
 def is_zero_docid(mem_a, pos_a):
