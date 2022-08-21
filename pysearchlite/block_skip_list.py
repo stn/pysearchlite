@@ -173,11 +173,10 @@ class BlockSkipListExt(object):
 
     def search(self, mem_a, pos_a):
         # Check the start position.
-        for level in range(1, self.max_level + 1):
+        for level in range(self.max_level + 1):
             #if doc_id_a <= self.last_id[level]:
             if compare_docid(self.mmap, self.last_cmp_pos[level], mem_a, pos_a) >= 0:
                 break
-        level -= 1
         block_idx = self.last_block_idx[level]
         block_pos = self.offset + self.block_size * block_idx
         pos = self.last_pos[level]
@@ -189,9 +188,10 @@ class BlockSkipListExt(object):
         #pos_id = self.mmap[block_pos + pos: block_pos + pos + DOCID_BYTES]
         #if pos_id >= doc_id_a:
         #    return pos_id
-        cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
-        if cmp >= 0:
-            return pos, cmp
+
+        #cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
+        #if cmp >= 0:
+        #    return pos, cmp
 
         # skip list
         while level > 0:
@@ -204,7 +204,7 @@ class BlockSkipListExt(object):
                     last_i = i
                     pos += docid_bytes(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
                     i += 1
-                    if i >= freq:  # reached to the end of the block
+                    if i >= freq or is_zero_docid(self.mmap, pos):  # reached to the end of the block
                         next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
                         if next_block_idx == 0:  # reached to the end of this level
                             self.last_cmp_pos[level] = last_pos
@@ -264,7 +264,7 @@ class BlockSkipListExt(object):
             if cmp < 0:
                 next_pos = pos + docid_bytes(self.mmap, pos)
                 i += 1
-                if i >= freq:  # reach to the end of the block
+                if i >= freq or is_zero_docid(self.mmap, next_pos):  # reach to the end of the block
                     next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
                     if next_block_idx == 0:  # reached to the end of id list
                         self.last_pos[0] = pos
@@ -279,6 +279,7 @@ class BlockSkipListExt(object):
                 else:
                     pos = next_pos
             else:  # cmp >= 0
+                self.last_cmp_pos[0] = pos
                 self.last_pos[0] = pos
                 self.last_i[0] = i
                 #self.last_id[0] = pos_id

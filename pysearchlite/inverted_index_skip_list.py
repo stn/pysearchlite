@@ -203,7 +203,7 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
         list_pos_a = list_a.intersection(list_b)
         # find common doc ids
-        for i, (freq_b, list_type_b, pos_b) in enumerate(state[2:]):
+        for freq_b, list_type_b, pos_b in state[2:]:
             list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
             list_pos_a = list_b.intersection_with_doc_ids(self.mmap, list_pos_a)
         return [decode_docid(self.mmap, pos) for pos in list_pos_a]

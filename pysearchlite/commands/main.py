@@ -17,6 +17,8 @@ def main():
     print(psl.search('the'))
     print(psl.search('los angeles'))
     print(psl.search('the national football league'))
+    print(psl.search('the book of life'))
+    print(psl.search('care a lot'))
 
 
 if __name__ == '__main__':
