@@ -161,6 +161,7 @@ class BlockSkipListExt(object):
         block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                      self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
         pos = self.last_pos[level]
+        last_block_idx = block_idx
         last_pos = pos
 
         # skip list
@@ -168,35 +169,30 @@ class BlockSkipListExt(object):
             while True:
                 cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
                 if cmp < 0:
+                    last_block_idx = block_idx
                     last_pos = pos
                     pos += bytes_docid(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
                     if pos >= block_end:  # reached to the end of the block
-                        next_block_idx = decode_block_idx(
+                        block_idx = decode_block_idx(
                             self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
-                        if next_block_idx == 0:  # reached to the end of this level
+                        if block_idx == 0:  # reached to the end of this level
+                            self.last_block_idx[level] = last_block_idx
                             self.last_cmp_pos[level] = last_pos
                             self.last_pos[level] = last_pos
                             pos = last_pos
                             break  # down the level
-                        next_block_offset = self.offset + self.block_size * next_block_idx
-                        next_pos0 = next_block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-                        if compare_docid(self.mmap, next_pos0, mem_a, pos_a) > 0:
-                            self.last_cmp_pos[level] = next_pos0
-                            self.last_pos[level] = last_pos
-                            pos = last_pos
-                            break  # down the level
-                        block_idx = next_block_idx
-                        block_offset = next_block_offset
+                        block_offset = self.offset + self.block_size * block_idx
                         block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                                      self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
-                        pos = next_pos0
-                        self.last_block_idx[level] = block_idx
+                        pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                 elif cmp > 0:
+                    self.last_block_idx[level] = last_block_idx
                     self.last_cmp_pos[level] = pos
                     self.last_pos[level] = last_pos
                     pos = last_pos
                     break  # down the level
                 else:  # cmp == 0:
+                    self.last_block_idx[level] = block_idx
                     self.last_cmp_pos[level] = pos
                     self.last_pos[level] = pos
                     return pos, cmp
