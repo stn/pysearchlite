@@ -221,7 +221,7 @@ def write_block_skip_list(skip_list, file):
     file.write(len(skip_list.blocks).to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
     for i, block in enumerate(skip_list.blocks):
         b = encode_block_idx(skip_list.next_block_idx[i])
-        b += skip_list.block_freq[i].to_bytes(1, sys.byteorder)
+        b += len(block).to_bytes(1, sys.byteorder)
         b += block
         assert len(b) <= skip_list.block_size
         if len(b) < skip_list.block_size:

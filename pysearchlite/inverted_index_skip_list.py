@@ -149,7 +149,7 @@ class InvertedIndexBlockSkipList(InvertedIndex):
                 ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
                 pos = self.mmap.tell()
                 self.data[token] = (ids_len, LIST_TYPE_DOC_IDS_LIST, pos)
-                for i in range(ids_len):
+                for _ in range(ids_len):
                     pos += bytes_docid(self.mmap, pos)
                 self.mmap.seek(pos)
             elif block_type == BLOCK_TYPE_SKIP_LIST:

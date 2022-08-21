@@ -20,34 +20,20 @@ class BlockSkipList(object):
         self.max_level = 0
         self.blocks = None
         self.next_block_idx = None
-        self.block_freq = None
         self.level_block_idx = None
         self.freq = 0
-        self.last_block_idx = None
-        self.last_pos = None
-        self.last_id = None
 
     @staticmethod
     def from_list(ids, block_size=SKIPLIST_BLOCK_SIZE, max_level=SKIPLIST_MAX_LEVEL):
         if len(ids) == 1:
             return SingleDocId(ids[0])
-        #elif len(ids) <= p:
-        #    return DocIdList(ids)
-
-        #max_level = min(int(math.log(max(len(ids) - 1, 1), p)), max_level)
 
         # Start from the fist element.
         doc_id = encode_docid(ids[0])
         blocks = [bytearray(doc_id)]
         next_block_idx = [0]
         block_freq = [1]
-        ## Prepare the first block of each level.
-        #for i in range(0, max_level):
-        #    # the first value and the index of one level down block
-        #    blocks.append([doc_id, encode_block_idx(i)])
-        #    next_block_idx.append(0)
 
-        #current_block = [i for i in range(max_level + 1)]
         current_block_idx = [0]
         level_block_idx = [0]
 
@@ -98,7 +84,6 @@ class BlockSkipList(object):
         s.blocks = blocks
         s.level_block_idx = level_block_idx
         s.next_block_idx = next_block_idx
-        s.block_freq = block_freq
         s.freq = len(ids)
         return s
 
@@ -134,7 +119,6 @@ class BlockSkipListExt(object):
         elif list_type == LIST_TYPE_SKIP_LIST:
             return BlockSkipListExt(mem, pos, freq)
 
-    @staticmethod
     def read(mem):
         block_type = mem[0:1]  # TODO
         if block_type == BLOCK_TYPE_DOC_ID:
@@ -149,181 +133,138 @@ class BlockSkipListExt(object):
             raise ValueError(f"Unsupported block type: {block_type}")
 
     def get_ids(self):
-        block_pos = self.offset
-        pos = SKIP_LIST_BLOCK_INDEX_BYTES + 1
-        i = 0
-        freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
+        block_offset = self.offset
+        block_size = self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES]
+        pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+        block_end = pos + block_size
         result = []
         while True:
-            if i >= freq:
-                block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
+            if pos >= block_end:
+                block_idx = decode_block_idx(self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                 if block_idx == 0:
                     break
-                block_pos = self.offset + self.block_size * block_idx
-                pos = SKIP_LIST_BLOCK_INDEX_BYTES + 1
-                i = 0
-                freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
-            pos_a = block_pos + pos
-            if is_zero_docid(self.mmap, pos_a):
-                break
-            result.append(pos_a)
-            pos += bytes_docid(self.mmap, pos_a)
-            i += 1
+                block_offset = self.offset + self.block_size * block_idx
+                block_size = self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES]
+                pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+                block_end = pos + block_size
+            result.append(pos)
+            pos += bytes_docid(self.mmap, pos)
         return result
 
     def search(self, mem_a, pos_a):
         # Check the start position.
         for level in range(self.max_level + 1):
-            #if doc_id_a <= self.last_id[level]:
             if compare_docid(self.mmap, self.last_cmp_pos[level], mem_a, pos_a) >= 0:
                 break
         block_idx = self.last_block_idx[level]
-        block_pos = self.offset + self.block_size * block_idx
+        block_offset = self.offset + self.block_size * block_idx
+        block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
+                     self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
         pos = self.last_pos[level]
-        i = self.last_i[level]
-        freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
         last_pos = pos
-        last_i = i
-        # When the first item is greater than the given doc id.
-        #pos_id = self.mmap[block_pos + pos: block_pos + pos + DOCID_BYTES]
-        #if pos_id >= doc_id_a:
-        #    return pos_id
-
-        #cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
-        #if cmp >= 0:
-        #    return pos, cmp
 
         # skip list
         while level > 0:
             while True:
-                #pos_id = self.mmap[block_pos + pos: block_pos + pos + DOCID_BYTES]
-                #if pos_id < doc_id_a:
                 cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
                 if cmp < 0:
                     last_pos = pos
-                    last_i = i
                     pos += bytes_docid(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
-                    i += 1
-                    if i >= freq or is_zero_docid(self.mmap, pos):  # reached to the end of the block
-                        next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
+                    if pos >= block_end:  # reached to the end of the block
+                        next_block_idx = decode_block_idx(
+                            self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                         if next_block_idx == 0:  # reached to the end of this level
                             self.last_cmp_pos[level] = last_pos
                             self.last_pos[level] = last_pos
-                            self.last_i[level] = last_i
                             pos = last_pos
-                            #self.last_id[level] = pos_id
                             break  # down the level
-                        next_block_pos = self.offset + self.block_size * next_block_idx
-                        #next_block0 = self.mmap[next_block_pos + SKIP_LIST_BLOCK_INDEX_BYTES:next_block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + DOCID_BYTES]
-                        #if next_block0 > doc_id_a:
-                        next_pos0 = next_block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+                        next_block_offset = self.offset + self.block_size * next_block_idx
+                        next_pos0 = next_block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                         if compare_docid(self.mmap, next_pos0, mem_a, pos_a) > 0:
                             self.last_cmp_pos[level] = next_pos0
                             self.last_pos[level] = last_pos
-                            self.last_i[level] = last_i
                             pos = last_pos
-                            #self.last_id[level] = next_block0
                             break  # down the level
-                        #block = next_block
                         block_idx = next_block_idx
-                        block_pos = next_block_pos
+                        block_offset = next_block_offset
+                        block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
+                                     self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                         pos = next_pos0
-                        i = 0
-                        freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
                         self.last_block_idx[level] = block_idx
-                #elif pos_id > doc_id_a:
                 elif cmp > 0:
                     self.last_cmp_pos[level] = pos
                     self.last_pos[level] = last_pos
-                    self.last_i[level] = last_i
                     pos = last_pos
-                    #self.last_id[level] = pos_id
                     break  # down the level
                 else:  # cmp == 0:
                     self.last_cmp_pos[level] = pos
                     self.last_pos[level] = pos
-                    self.last_i[level] = last_i
-                    #self.last_id[level] = pos_id
                     return pos, cmp
             level -= 1
             pos += bytes_docid(self.mmap, pos)
             block_idx = decode_block_idx(self.mmap[pos:pos + SKIP_LIST_BLOCK_INDEX_BYTES])
-            block_pos = self.offset + self.block_size * block_idx
-            pos = block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-            i = 0
-            freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
+            block_offset = self.offset + self.block_size * block_idx
+            block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
+                         self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+            pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
             self.last_block_idx[level] = block_idx
             self.last_pos[level] = pos
-            self.last_i[level] = 0
 
         # ids
         while True:
-            #pos_id = self.mmap[block_pos + pos: block_pos + pos + DOCID_BYTES]
-            #if pos_id < doc_id_a:
             cmp = compare_docid(self.mmap, pos, mem_a, pos_a)
             if cmp < 0:
                 next_pos = pos + bytes_docid(self.mmap, pos)
-                i += 1
-                if i >= freq or is_zero_docid(self.mmap, next_pos):  # reach to the end of the block
-                    next_block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
+                if next_pos >= block_end:  # reach to the end of the block
+                    next_block_idx = decode_block_idx(
+                        self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                     if next_block_idx == 0:  # reached to the end of id list
+                        self.last_cmp_pos[0] = pos
                         self.last_pos[0] = pos
-                        self.last_i[0] = i - 1
-                        #self.last_id[0] = pos_id
                         return pos, cmp
-                    block_pos = self.offset + self.block_size * next_block_idx
+                    block_offset = self.offset + self.block_size * next_block_idx
+                    block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
+                                 self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+                    pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                     self.last_block_idx[0] = next_block_idx
-                    pos = block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-                    i = 0
-                    freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
                 else:
                     pos = next_pos
             else:  # cmp >= 0
                 self.last_cmp_pos[0] = pos
                 self.last_pos[0] = pos
-                self.last_i[0] = i
-                #self.last_id[0] = pos_id
                 return pos, cmp
 
     def intersection(self, b):
-        block_pos = self.offset
-        pos = block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-        i = 0
-        freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
+        block_offset = self.offset
+        block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
+                     self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+        pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
         b.reset()
         result = []
-        #doc_id_b = b'\x00\x00\x00\x00'
         while True:
-            if i >= freq:
-                block_idx = decode_block_idx(self.mmap[block_pos:block_pos + SKIP_LIST_BLOCK_INDEX_BYTES])
+            if pos >= block_end:
+                block_idx = decode_block_idx(self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                 if block_idx == 0:
                     break
-                block_pos = self.offset + self.block_size * block_idx
-                pos = block_pos + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-                i = 0
-                freq = self.mmap[block_pos + SKIP_LIST_BLOCK_INDEX_BYTES]
-            #if doc_id_a == b'\x00\x00\x00\x00':
-            #    break
+                block_offset = self.offset + self.block_size * block_idx
+                block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
+                             self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+                pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
             pos_b, cmp = b.search(self.mmap, pos)
-            #if doc_id_b == doc_id_a:
             if cmp == 0:
                 result.append(pos)
-            #elif doc_id_b < doc_id_a:  # reached to the end of b
             elif cmp < 0:  # reached to the end of b
                 break
             pos += bytes_docid(self.mmap, pos)
-            i += 1
         return result
 
     def intersection_with_doc_ids(self, mem_a, list_pos_a):
         self.reset()
         result = []
         for pos_a in list_pos_a:
-            #if doc_id_b == doc_id_a:
             pos_b, cmp = self.search(mem_a, pos_a)
             if cmp == 0:
                 result.append(pos_a)
-            #if doc_id_b < doc_id_a:  # reached to the end of b
             if cmp < 0:  # reached to the end of b
                 break
         return result
@@ -333,8 +274,6 @@ class BlockSkipListExt(object):
         self.last_pos = [self.offset + self.block_size * self.level_block_idx[i] + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                          for i in range(self.max_level + 1)]
         self.last_cmp_pos = self.last_pos[:]
-        self.last_i = [0] * (self.max_level + 1)
-        #self.last_id = [b'\x00\x00\x00\x00'] * (self.max_level + 1)
 
 
 class DocIdList(object):
@@ -359,7 +298,7 @@ class DocIdListExt(object):
     def get_ids(self):
         pos = self.offset
         result = []
-        for i in range(self.freq):
+        for _ in range(self.freq):
             result.append(pos)
             pos += bytes_docid(self.mmap, pos)
         return result
@@ -385,7 +324,6 @@ class DocIdListExt(object):
         result = []
         # assume len(a) < len(b)
         for i in range(self.freq):
-            #doc_id_a = self.mmap[pos:pos + DOCID_BYTES]
             pos_b, cmp = b.search(self.mmap, pos)
             if cmp == 0:
                 result.append(pos)
