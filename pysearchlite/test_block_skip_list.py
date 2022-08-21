@@ -87,13 +87,10 @@ def test_block_skip_list_fromlist():
     assert sl.next_block_idx == [1, 0, 3, 0]
 
 
-#@pytest.mark.parametrize('arr, target', search_test_cases(10, 20))
-@pytest.mark.parametrize('arr, target', [([4, 6, 13, 31, 32, 35, 36, 38, 44, 46, 51, 53, 56, 58], 59)])
+@pytest.mark.parametrize('arr, target', search_test_cases(100, 50))
 def test_block_skip_list_ext_search(arr, target):
-    print(arr)
-    print(target)
     # prepare skip_list_ext
-    skip_list = BlockSkipList.from_list(arr, block_size=12)
+    skip_list = BlockSkipList.from_list(arr, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file:
         skip_list.write(file)
         file.seek(0)
@@ -123,10 +120,12 @@ def skip_list_and_test_cases(num, max_len):
     return tests
 
 
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
+@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 50))
 def test_skip_list_ext_intersection(a, b):
-    s = BlockSkipList.from_list(a, block_size=12)
-    t = BlockSkipList.from_list(b, block_size=12)
+    print(a)
+    print(b)
+    s = BlockSkipList.from_list(a, block_size=20)
+    t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_s:
         with TemporaryFile(prefix="pysearchlite_") as file_t:
             s.write(file_s)
@@ -141,7 +140,7 @@ def test_skip_list_ext_intersection(a, b):
             assert set([decode_docid(mem_s, x) for x in result]) == set(a) & set(b)
 
 
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
+@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 50))
 def test_skip_list_ext_intersection_with_doc_ids(a, b):
     enc_a = [encode_docid(x) for x in a]
     mem_a = b''.join(enc_a)
