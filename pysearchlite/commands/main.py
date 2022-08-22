@@ -11,7 +11,8 @@ def main():
         doc = json.loads(line)
         psl.index(doc['id'], doc['text'])
     psl.save_index()
-    psl.clear_index()
+
+    psl.init('idx')
     psl.restore_index()
     # Search
     print(psl.search('united states constitution'))
