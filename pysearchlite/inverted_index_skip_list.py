@@ -4,11 +4,28 @@ import shutil
 import sys
 from operator import itemgetter
 
-from .block_skip_list import BlockSkipList, DocIdListExt, BlockSkipListExt, LIST_TYPE_DOC_ID, LIST_TYPE_DOC_IDS_LIST, \
-    LIST_TYPE_SKIP_LIST
-from .gamma_codecs import read_token, write_token, copy_ids, write_doc_ids, merge_ids, read_doc_ids, BLOCK_TYPE_DOC_ID, \
-    DOCID_BYTES, BLOCK_TYPE_DOC_IDS_LIST, DOCID_LEN_BYTES, BLOCK_TYPE_SKIP_LIST, SKIP_LIST_BLOCK_INDEX_BYTES, \
-    decode_docid
+from .block_skip_list import (
+    BlockSkipList,
+    BlockSkipListExt,
+    DocIdListExt,
+    LIST_TYPE_DOC_ID,
+    LIST_TYPE_DOC_IDS_LIST,
+    LIST_TYPE_SKIP_LIST,
+)
+from .gamma_codecs import (
+    BLOCK_TYPE_DOC_ID,
+    BLOCK_TYPE_DOC_IDS_LIST,
+    BLOCK_TYPE_SKIP_LIST,
+    DOCID_LEN_BYTES,
+    SKIP_LIST_BLOCK_INDEX_BYTES,
+    copy_ids,
+    decode_docid,
+    merge_ids,
+    read_doc_ids,
+    read_token,
+    write_doc_ids,
+    write_token,
+)
 from .gamma_codecs import bytes_docid
 from .inverted_index import InvertedIndex
 

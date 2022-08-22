@@ -1,9 +1,22 @@
 import os
 import sys
 
-from pysearchlite.gamma_codecs import SKIP_LIST_BLOCK_INDEX_BYTES, BLOCK_TYPE_DOC_ID, \
-    BLOCK_TYPE_DOC_IDS_LIST, BLOCK_TYPE_SKIP_LIST, DOCID_LEN_BYTES, encode_docid, encode_block_idx, decode_block_idx, \
-    compare_docid, is_zero_docid, write_single_doc_id, bytes_docid, write_doc_ids_list, write_block_skip_list
+from pysearchlite.gamma_codecs import (
+    BLOCK_TYPE_DOC_ID,
+    BLOCK_TYPE_DOC_IDS_LIST,
+    BLOCK_TYPE_SKIP_LIST,
+    DOCID_LEN_BYTES,
+    SKIP_LIST_BLOCK_INDEX_BYTES,
+    bytes_docid,
+    compare_docid,
+    decode_block_idx,
+    encode_block_idx,
+    encode_docid,
+    bytes_block_idx,
+    write_block_skip_list,
+    write_doc_ids_list,
+    write_single_doc_id,
+)
 
 SKIPLIST_BLOCK_SIZE = int(os.environ.get('PYSEARCHLITE_SKIPLIST_BLOCK_SIZE', '44'))
 SKIPLIST_MAX_LEVEL = int(os.environ.get('PYSEARCHLITE_SKIPLIST_MAX_LEVEL', '10'))
@@ -73,16 +86,19 @@ class BlockSkipList(object):
                     level += 1
                     if len(current_block_idx) <= level:
                         # new level
-                        new_block_idx = add_new_block(bytearray(encode_docid(ids[0]) + encode_block_idx(level_block_idx[level - 1])))
+                        new_block_idx = add_new_block(
+                            bytearray(encode_docid(ids[0]) + encode_block_idx(level_block_idx[level - 1])))
                         level_block_idx.append(new_block_idx)
                         current_block_idx.append(new_block_idx)
                     skip_list_block = blocks[current_block_idx[level]]
-                    if len(skip_list_block) + len(doc_id) + 1 + SKIP_LIST_BLOCK_INDEX_BYTES * 2 <= block_size:
+                    lower_level_idx_enc = encode_block_idx(current_block_idx[level - 1])
+                    if (len(skip_list_block) + len(doc_id) + len(lower_level_idx_enc)
+                            + 1 + SKIP_LIST_BLOCK_INDEX_BYTES) <= block_size:
                         skip_list_block.extend(doc_id)
-                        skip_list_block.extend(encode_block_idx(current_block_idx[level - 1]))
+                        skip_list_block.extend(lower_level_idx_enc)
                         break
                     # new block for skip list
-                    new_block_idx = add_new_block(bytearray(doc_id + encode_block_idx(current_block_idx[level - 1])))
+                    new_block_idx = add_new_block(bytearray(doc_id + lower_level_idx_enc))
                     next_block_idx[current_block_idx[level]] = new_block_idx
                     current_block_idx[level] = new_block_idx
 
@@ -150,7 +166,8 @@ class BlockSkipListExt(object):
         result = []
         while True:
             if pos >= block_end:
-                block_idx = decode_block_idx(self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+                block_idx = int.from_bytes(
+                    self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
                 if block_idx == 0:
                     break
                 block_offset = self.offset + self.block_size * block_idx
@@ -181,10 +198,11 @@ class BlockSkipListExt(object):
                 if cmp < 0:
                     last_block_idx = block_idx
                     last_pos = pos
-                    pos += bytes_docid(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
+                    pos += bytes_docid(self.mmap, pos)
+                    pos += bytes_block_idx(self.mmap, pos)
                     if pos >= block_end:  # reached to the end of the block
-                        block_idx = decode_block_idx(
-                            self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+                        block_idx = int.from_bytes(
+                            self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
                         if block_idx == 0:  # reached to the end of this level
                             self.last_block_idx[level] = last_block_idx
                             self.last_cmp_pos[level] = last_pos
@@ -208,14 +226,15 @@ class BlockSkipListExt(object):
                     return pos, cmp
             level -= 1
             pos += bytes_docid(self.mmap, pos)
-            block_idx = decode_block_idx(self.mmap[pos:pos + SKIP_LIST_BLOCK_INDEX_BYTES])
+            block_idx = decode_block_idx(self.mmap, pos)
             block_offset = self.offset + self.block_size * block_idx
             block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                          self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
             pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
             # The lower level should have at least two doc ids, but ...
             #if level > 0:
-            #    pos += bytes_docid(self.mmap, pos) + SKIP_LIST_BLOCK_INDEX_BYTES
+            #    pos += bytes_docid(self.mmap, pos)
+            #    pos += bytes_block_idx(self.mmap, pos)
             #else:
             #    pos += bytes_docid(self.mmap, pos)
 
@@ -227,8 +246,8 @@ class BlockSkipListExt(object):
                 last_pos = pos
                 pos += bytes_docid(self.mmap, pos)
                 if pos >= block_end:  # reach to the end of the block
-                    block_idx = decode_block_idx(
-                        self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+                    block_idx = int.from_bytes(
+                        self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
                     if block_idx == 0:  # reached to the end of id list
                         self.last_block_idx[0] = last_block_idx
                         self.last_cmp_pos[0] = last_pos
@@ -253,7 +272,8 @@ class BlockSkipListExt(object):
         result = []
         while True:
             if pos >= block_end:
-                block_idx = decode_block_idx(self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
+                block_idx = int.from_bytes(
+                    self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
                 if block_idx == 0:
                     break
                 block_offset = self.offset + self.block_size * block_idx

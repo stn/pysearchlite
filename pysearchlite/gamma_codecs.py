@@ -167,16 +167,16 @@ def compare_docid(mem_a, pos_a, mem_b, pos_b):
     return compare_gamma(mem_a, pos_a, mem_b, pos_b)
 
 
-def is_zero_docid(mem_a, pos_a):
-    return mem_a[pos_a] == 0
-
-
 def encode_block_idx(idx):
-    return idx.to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder)
+    return gamma_encoding(idx)
 
 
-def decode_block_idx(idx):
-    return int.from_bytes(idx, sys.byteorder)
+def decode_block_idx(mem, pos):
+    return decode_gamma(mem, pos)
+
+
+def bytes_block_idx(mem, pos):
+    return bytes_gamma(mem, pos)
 
 
 def write_doc_ids(f, doc_ids):
@@ -220,7 +220,9 @@ def write_block_skip_list(skip_list, file):
         file.write(skip_list.level_block_idx[i].to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
     file.write(len(skip_list.blocks).to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
     for i, block in enumerate(skip_list.blocks):
-        b = encode_block_idx(skip_list.next_block_idx[i])
+        # TODO use variable bytes encoding
+        #b = encode_block_idx(skip_list.next_block_idx[i])
+        b = skip_list.next_block_idx[i].to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder)
         b += len(block).to_bytes(1, sys.byteorder)
         b += block
         assert len(b) <= skip_list.block_size

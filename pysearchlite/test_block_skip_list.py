@@ -68,23 +68,22 @@ def test_block_skip_list_fromlist():
     sl = BlockSkipList.from_list([1, 2, 3], block_size=block_size, max_level=max_level)
     assert type(sl) == DocIdList
     assert sl.ids == [V_1, V_2, V_3]
-    sl = BlockSkipList.from_list([1, 2, 3, 4], block_size=block_size, max_level=max_level)
-    assert type(sl) == DocIdList
-    assert sl.ids == [V_1, V_2, V_3, V_4]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], block_size=block_size, max_level=max_level)
-    assert type(sl) == DocIdList
-    assert sl.ids == [V_1, V_2, V_3, V_4, V_5]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=block_size, max_level=max_level)
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=9, max_level=max_level)
+    assert sl.block_size == 9
     assert sl.max_level == 2
-    assert sl.blocks == [bytearray(b'\x01\x02\x03\x04\x05'), bytearray(b'\x06\x07\x08\x09'),
-                         bytearray(b'\x01\x00\x00\x00\x00'), bytearray(b'\x06\x01\x00\x00\x00'),
-                         bytearray(b'\x01\x02\x00\x00\x00'), bytearray(b'\x06\x03\x00\x00\x00')]
-    assert sl.next_block_idx == [1, 0, 3, 0, 5, 0]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=block_size, max_level=1)
+    assert sl.blocks == [bytearray(b'\x01\x02\x03\x04'), bytearray(b'\x05\x06\x07\x08'), bytearray(b'\x01\x00\x05\x01'),
+                         bytearray(b'\x09'), bytearray(b'\x09\x03'),
+                         bytearray(b'\x01\x02\x09\x04')]
+    assert sl.next_block_idx == [1, 3, 4, 0, 0, 0]
+    assert sl.level_block_idx == [0, 2, 5]
+    assert sl.freq == 9
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=9, max_level=1)
     assert sl.max_level == 1
-    assert sl.blocks == [bytearray(b'\x01\x02\x03\x04\x05'), bytearray(b'\x06\x07\x08\t'),
-                         bytearray(b'\x01\x00\x00\x00\x00'), bytearray(b'\x06\x01\x00\x00\x00')]
-    assert sl.next_block_idx == [1, 0, 3, 0]
+    assert sl.blocks == [bytearray(b'\x01\x02\x03\x04'), bytearray(b'\x05\x06\x07\x08'), bytearray(b'\x01\x00\x05\x01'),
+                         bytearray(b'\x09'), bytearray(b'\x09\x03')]
+    assert sl.next_block_idx == [1, 3, 4, 0, 0]
+    assert sl.level_block_idx == [0, 2]
+    assert sl.freq == 9
 
 
 @pytest.mark.parametrize('arr, target', search_test_cases(100, 50))
