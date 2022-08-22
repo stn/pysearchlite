@@ -39,7 +39,7 @@ class BlockSkipList(object):
     @staticmethod
     def from_list(ids, block_size=SKIPLIST_BLOCK_SIZE, max_level=SKIPLIST_MAX_LEVEL):
         """
-        Return a BlockSkipList or DocIdList from the given ids.
+        Return a BlockSkipList, DocIdList, or SingleDocId from the given ids.
 
         Parameters
         ----------
@@ -52,7 +52,7 @@ class BlockSkipList(object):
 
         Returns
         -------
-        list: BlockSkipList or DocIdList
+        list: BlockSkipList, DocIdList, or SingleDocId
         """
         if len(ids) == 1:
             return SingleDocId(ids[0])
@@ -145,6 +145,7 @@ class BlockSkipListExt(object):
         elif list_type == LIST_TYPE_SKIP_LIST:
             return BlockSkipListExt(mem, pos, freq)
 
+    @staticmethod
     def read(mem):
         block_type = mem[0:1]  # TODO
         if block_type == BLOCK_TYPE_DOC_ID:
@@ -289,7 +290,7 @@ class BlockSkipListExt(object):
             pos_b, cmp = self.search(mem_a, pos_a)
             if cmp == 0:
                 result.append(pos_a)
-            if cmp < 0:  # reached to the end of b
+            elif cmp < 0:  # reached to the end of b
                 break
         return result
 

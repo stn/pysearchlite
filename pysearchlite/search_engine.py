@@ -27,7 +27,6 @@ def init(idx_dir):
 def index(name, text):
     idx = DOC_LIST.add(name)
 
-    # consider a text as a bag of words for now.
     tokens = normalized_tokens(text)
     INVERTED_INDEX.add(idx, tokens)
 
