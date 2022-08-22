@@ -3,7 +3,7 @@ from functools import reduce
 from glob import glob
 
 from .doc_list import MemoryDocList
-from .gamma_codecs import VAR_ENCODE_MAX2
+from .gamma_codecs import VAR_ENCODE_MAX3
 from .inverted_index import INVERTED_INDEX_FILENAME
 from .inverted_index_skip_list import InvertedIndexBlockSkipList
 from .tokenize import normalized_tokens
@@ -13,7 +13,7 @@ INDEX_DIR = None
 DOC_LIST = None
 INVERTED_INDEX = []
 
-MAX_NDOC = VAR_ENCODE_MAX2 - 1
+MAX_NDOC = VAR_ENCODE_MAX3 - 1
 
 
 def init(idx_dir):
