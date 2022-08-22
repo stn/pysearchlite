@@ -22,6 +22,7 @@ def main(idx_dir):
             count = 0
         sys.stdout.write(str(count) + '\n')
         sys.stdout.flush()
+    psl.close()
 
 
 if __name__ == '__main__':

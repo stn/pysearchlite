@@ -23,6 +23,8 @@ def main():
     print(psl.search('care a lot'))
     print(psl.search('usb hub'))
 
+    psl.close()
+
 
 if __name__ == '__main__':
     main()
