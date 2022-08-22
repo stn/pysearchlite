@@ -25,6 +25,22 @@ class BlockSkipList(object):
 
     @staticmethod
     def from_list(ids, block_size=SKIPLIST_BLOCK_SIZE, max_level=SKIPLIST_MAX_LEVEL):
+        """
+        Return a BlockSkipList or DocIdList from the given ids.
+
+        Parameters
+        ----------
+        ids: list[int]
+            a list of doc ids
+        block_size: int, default SKIPLIST_BLOCK_SIZE
+            the size of block
+        max_level: int, default SKIPLIST_MAX_LEVEL
+            the maximum level of skip list
+
+        Returns
+        -------
+        list: BlockSkipList or DocIdList
+        """
         if len(ids) == 1:
             return SingleDocId(ids[0])
 
@@ -32,10 +48,15 @@ class BlockSkipList(object):
         doc_id = encode_docid(ids[0])
         blocks = [bytearray(doc_id)]
         next_block_idx = [0]
-        block_freq = [1]
 
         current_block_idx = [0]
         level_block_idx = [0]
+
+        def add_new_block(content):
+            idx = len(blocks)
+            blocks.append(content)
+            next_block_idx.append(0)
+            return idx
 
         for i in range(1, len(ids)):
             level = 0
@@ -43,39 +64,30 @@ class BlockSkipList(object):
             doc_id = encode_docid(ids[i])
             if len(block) + len(doc_id) + 1 + SKIP_LIST_BLOCK_INDEX_BYTES <= block_size:
                 block.extend(doc_id)
-                block_freq[current_block_idx[0]] += 1
             else:
-                new_block_idx = len(blocks)
+                new_block_idx = add_new_block(bytearray(doc_id))
                 next_block_idx[current_block_idx[0]] = new_block_idx
-                blocks.append(bytearray(doc_id))  # new block
-                next_block_idx.append(0)
-                block_freq.append(1)
                 current_block_idx[0] = new_block_idx
                 # skip list
                 while level < max_level:
                     level += 1
                     if len(current_block_idx) <= level:
-                        new_block_idx = len(blocks)
-                        docid0 = encode_docid(ids[0])
-                        blocks.append(bytearray(docid0 + encode_block_idx(level_block_idx[level - 1])))
+                        # new level
+                        new_block_idx = add_new_block(bytearray(encode_docid(ids[0]) + encode_block_idx(level_block_idx[level - 1])))
                         level_block_idx.append(new_block_idx)
-                        next_block_idx.append(0)
-                        block_freq.append(1)
                         current_block_idx.append(new_block_idx)
                     skip_list_block = blocks[current_block_idx[level]]
                     if len(skip_list_block) + len(doc_id) + 1 + SKIP_LIST_BLOCK_INDEX_BYTES * 2 <= block_size:
                         skip_list_block.extend(doc_id)
                         skip_list_block.extend(encode_block_idx(current_block_idx[level - 1]))
-                        block_freq[current_block_idx[level]] += 1
                         break
-                    new_block_idx = len(blocks)
+                    # new block for skip list
+                    new_block_idx = add_new_block(bytearray(doc_id + encode_block_idx(current_block_idx[level - 1])))
                     next_block_idx[current_block_idx[level]] = new_block_idx
-                    blocks.append(bytearray(doc_id + encode_block_idx(current_block_idx[level - 1])))  # new block
-                    next_block_idx.append(0)
-                    block_freq.append(1)
                     current_block_idx[level] = new_block_idx
 
         if len(level_block_idx) == 1:
+            # TODO maybe we can generate DocIdList directly from blocks
             return DocIdList(ids)
 
         s = BlockSkipList()
