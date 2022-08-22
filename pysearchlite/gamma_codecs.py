@@ -195,16 +195,16 @@ def read_doc_ids(f):
 
 def copy_ids(dst, src):
     docid_len_bytes = src.read(DOCID_LEN_BYTES)
-    doc_ids_len = int.from_bytes(docid_len_bytes, BYTEORDER)
+    doc_ids_len = int.from_bytes(docid_len_bytes, sys.byteorder)
     dst.write(docid_len_bytes)
     doc_ids_bytes = src.read(doc_ids_len * DOCID_BYTES)
     dst.write(doc_ids_bytes)
 
 
 def merge_ids(dst, src1, src2):
-    doc_ids_len1 = int.from_bytes(src1.read(DOCID_LEN_BYTES), BYTEORDER)
-    doc_ids_len2 = int.from_bytes(src2.read(DOCID_LEN_BYTES), BYTEORDER)
-    dst.write((doc_ids_len1 + doc_ids_len2).to_bytes(DOCID_LEN_BYTES, BYTEORDER))
+    doc_ids_len1 = int.from_bytes(src1.read(DOCID_LEN_BYTES), sys.byteorder)
+    doc_ids_len2 = int.from_bytes(src2.read(DOCID_LEN_BYTES), sys.byteorder)
+    dst.write((doc_ids_len1 + doc_ids_len2).to_bytes(DOCID_LEN_BYTES, sys.byteorder))
     doc_ids_bytes = src1.read(doc_ids_len1 * DOCID_BYTES)
     dst.write(doc_ids_bytes)
     doc_ids_bytes = src2.read(doc_ids_len2 * DOCID_BYTES)
