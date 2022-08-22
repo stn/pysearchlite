@@ -21,4 +21,4 @@ from .inverted_index_skip_list import InvertedIndexBlockSkipList
 #from .spim_inverted_index_skip_list_memory import SinglePassInMemoryInvertedIndexSkipListMemory
 
 
-VERSION = '0.4.17'
+VERSION = '0.4.18'
