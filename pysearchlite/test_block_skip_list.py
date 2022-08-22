@@ -5,7 +5,7 @@ from tempfile import TemporaryFile
 import pytest as pytest
 
 from .block_skip_list import BlockSkipList, SingleDocId, DocIdList, BlockSkipListExt
-from .codecs import encode_docid, decode_docid, DOCID_BYTES
+from .gamma_codecs import encode_docid, decode_docid, DOCID_BYTES
 
 B_0 = b'\x00\x00\x00\x00'
 B_1 = b'\x00\x00\x00\x01'
@@ -24,6 +24,17 @@ L_2 = b'\x02\x00\x00\x00'
 L_3 = b'\x03\x00\x00\x00'
 L_4 = b'\x04\x00\x00\x00'
 L_5 = b'\x05\x00\x00\x00'
+
+V_0 = b'\x00'
+V_1 = b'\x01'
+V_2 = b'\x02'
+V_3 = b'\x03'
+V_4 = b'\x04'
+V_5 = b'\x05'
+V_6 = b'\x06'
+V_7 = b'\x07'
+V_8 = b'\x08'
+V_9 = b'\x09'
 
 
 def linear_search(arr, target, left=0, right=None):
@@ -46,38 +57,36 @@ def search_test_cases(num, max_len):
 
 
 def test_block_skip_list_fromlist():
-    block_size = 20
+    block_size = 10
     max_level = 2
     sl = BlockSkipList.from_list([1], block_size=block_size, max_level=max_level)
     assert type(sl) == SingleDocId
-    assert sl.doc_id == B_1
+    assert sl.doc_id == V_1
     sl = BlockSkipList.from_list([1, 2], block_size=block_size, max_level=max_level)
     assert type(sl) == DocIdList
-    assert sl.ids == [B_1, B_2]
+    assert sl.ids == [V_1, V_2]
     sl = BlockSkipList.from_list([1, 2, 3], block_size=block_size, max_level=max_level)
     assert type(sl) == DocIdList
-    assert sl.ids == [B_1, B_2, B_3]
-    sl = BlockSkipList.from_list([1, 2, 3, 4], block_size=block_size, max_level=max_level)
-    assert type(sl) == DocIdList
-    assert sl.ids == [B_1, B_2, B_3, B_4]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5], block_size=block_size, max_level=max_level)
-    assert sl.max_level == 1
-    assert sl.blocks == [bytearray(B_1 + B_2 + B_3 + B_4), bytearray(B_5), bytearray(B_1 + L_0 + B_5 + L_1)]
-    assert sl.next_block_idx == [1, 0, 0]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=block_size, max_level=max_level)
+    assert sl.ids == [V_1, V_2, V_3]
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=9, max_level=max_level)
+    assert sl.block_size == 9
     assert sl.max_level == 2
-    assert sl.blocks == [bytearray(B_1 + B_2 + B_3 + B_4), bytearray(B_5 + B_6 + B_7 + B_8),
-                         bytearray(B_1 + L_0 + B_5 + L_1), bytearray(B_9), bytearray(B_9 + L_3),
-                         bytearray(B_1 + L_2 + B_9 + L_4)]
+    assert sl.blocks == [bytearray(b'\x01\x02\x03\x04'), bytearray(b'\x05\x06\x07\x08'), bytearray(b'\x01\x00\x05\x01'),
+                         bytearray(b'\x09'), bytearray(b'\x09\x03'),
+                         bytearray(b'\x01\x02\x09\x04')]
     assert sl.next_block_idx == [1, 3, 4, 0, 0, 0]
-    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=block_size, max_level=1)
+    assert sl.level_block_idx == [0, 2, 5]
+    assert sl.freq == 9
+    sl = BlockSkipList.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9], block_size=9, max_level=1)
     assert sl.max_level == 1
-    assert sl.blocks == [bytearray(B_1 + B_2 + B_3 + B_4), bytearray(B_5 + B_6 + B_7 + B_8),
-                         bytearray(B_1 + L_0 + B_5 + L_1), bytearray(B_9), bytearray(B_9 + L_3)]
+    assert sl.blocks == [bytearray(b'\x01\x02\x03\x04'), bytearray(b'\x05\x06\x07\x08'), bytearray(b'\x01\x00\x05\x01'),
+                         bytearray(b'\x09'), bytearray(b'\x09\x03')]
     assert sl.next_block_idx == [1, 3, 4, 0, 0]
+    assert sl.level_block_idx == [0, 2]
+    assert sl.freq == 9
 
 
-@pytest.mark.parametrize('arr, target', search_test_cases(100, 30))
+@pytest.mark.parametrize('arr, target', search_test_cases(100, 50))
 def test_block_skip_list_ext_search(arr, target):
     # prepare skip_list_ext
     skip_list = BlockSkipList.from_list(arr, block_size=20)
@@ -92,9 +101,9 @@ def test_block_skip_list_ext_search(arr, target):
         ret, cmp = skip_list_ext.search(mem_target, 0)
         i = linear_search(arr, target)
         if i == len(arr):
-            assert decode_docid(mem[ret:ret + DOCID_BYTES]) == arr[-1]
+            assert decode_docid(mem, ret) == arr[-1]
         else:
-            assert decode_docid(mem[ret:ret + DOCID_BYTES]) == arr[i]
+            assert decode_docid(mem, ret) == arr[i]
 
 
 def skip_list_and_test_cases(num, max_len):
@@ -110,8 +119,10 @@ def skip_list_and_test_cases(num, max_len):
     return tests
 
 
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
+@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 50))
 def test_skip_list_ext_intersection(a, b):
+    print(a)
+    print(b)
     s = BlockSkipList.from_list(a, block_size=20)
     t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_s:
@@ -125,13 +136,19 @@ def test_skip_list_ext_intersection(a, b):
             mem_t = mmap.mmap(file_t.fileno(), length=0, access=mmap.ACCESS_READ)
             t_ext = BlockSkipListExt.read(mem_t)
             result = s_ext.intersection(t_ext)
-            assert set([decode_docid(mem_s[x:x+DOCID_BYTES]) for x in result]) == set(a) & set(b)
+            assert set([decode_docid(mem_s, x) for x in result]) == set(a) & set(b)
 
 
-@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 30))
+@pytest.mark.parametrize('a, b', skip_list_and_test_cases(100, 50))
 def test_skip_list_ext_intersection_with_doc_ids(a, b):
-    mem_a = b''.join([encode_docid(x) for x in a])
-    list_pos_a = [i * DOCID_BYTES for i in range(len(a))]
+    enc_a = [encode_docid(x) for x in a]
+    mem_a = b''.join(enc_a)
+    list_pos_a = [0]
+    pos_a = 0
+    for x in enc_a:
+        list_pos_a.append(pos_a)
+        pos_a += len(x)
+
     t = BlockSkipList.from_list(b, block_size=20)
     with TemporaryFile(prefix="pysearchlite_") as file_t:
         t.write(file_t)
@@ -139,4 +156,4 @@ def test_skip_list_ext_intersection_with_doc_ids(a, b):
         mem_t = mmap.mmap(file_t.fileno(), length=0, access=mmap.ACCESS_READ)
         t_ext = BlockSkipListExt.read(mem_t)
         result = t_ext.intersection_with_doc_ids(mem_a, list_pos_a)
-    assert set([decode_docid(mem_a[x:x+DOCID_BYTES]) for x in result]) == set(a) & set(b)
+    assert set([decode_docid(mem_a, x) for x in result]) == set(a) & set(b)
