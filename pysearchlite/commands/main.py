@@ -14,6 +14,7 @@ def main():
     psl.clear_index()
     psl.restore_index()
     # Search
+    print(psl.search('united states constitution'))
     print(psl.search('search'))
     print(psl.search('los angeles'))
     print(psl.search('the national football league'))
