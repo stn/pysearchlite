@@ -231,12 +231,6 @@ class BlockSkipListExt(object):
             block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                          self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
             pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-            # The lower level should have at least two doc ids, but ...
-            #if level > 0:
-            #    pos += bytes_docid(self.mmap, pos)
-            #    pos += bytes_block_idx(self.mmap, pos)
-            #else:
-            #    pos += bytes_docid(self.mmap, pos)
 
         # ids
         while True:
