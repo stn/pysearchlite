@@ -222,7 +222,7 @@ class BlockSkipListExtIter(object):
         self.list = block_skip_list
         self.mmap = block_skip_list.mmap
         self.last_block_idx = [block_skip_list.level_block_idx[i] for i in range(block_skip_list.max_level + 1)]
-        self.last_pos = [self._get_block_offset(block_skip_list.level_block_idx[i]) + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+        self.last_pos = [self._get_block_offset(self.last_block_idx[i]) + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                          for i in range(block_skip_list.max_level + 1)]
         self.last_cmp_pos = self.last_pos[:]
         self.last_level = block_skip_list.max_level
@@ -238,6 +238,9 @@ class BlockSkipListExtIter(object):
 
     def _get_next_block_idx(self, block_offset):
         return int.from_bytes(self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
+
+    def get_pos(self):
+        return self.last_pos[self.last_level]
 
     def search(self, mem_a, pos_a):
         # Check the start position.
@@ -407,6 +410,9 @@ class DocIdListExtIter(object):
         self.current_idx = 0
         self.current_pos = doc_id_list.offset
 
+    def get_pos(self):
+        return self.current_pos
+
     def search(self, mem_a, pos_a):
         i = self.current_idx
         pos = self.current_pos
@@ -477,11 +483,15 @@ class SingleDocIdExt(object):
 class SingleDocIdExtIter(object):
 
     def __init__(self, single_doc_id):
-        self.sdi = single_doc_id
+        self.mmap = single_doc_id.mmap
+        self.offset = single_doc_id.offset
+
+    def get_pos(self):
+        return self.offset
 
     def search(self, mem_a, pos_a):
-        cmp = compare_docid(self.sdi.mmap, self.sdi.offset, mem_a, pos_a)
-        return self.sdi.offset, cmp
+        cmp = compare_docid(self.mmap, self.offset, mem_a, pos_a)
+        return self.offset, cmp
 
     def next_pos(self):
-        return self.sdi.offset, -1
+        return self.offset, -1

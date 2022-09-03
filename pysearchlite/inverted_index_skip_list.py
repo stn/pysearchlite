@@ -202,7 +202,8 @@ class InvertedIndexBlockSkipList(InvertedIndex):
             freq, list_type, pos = self.data.get(t, (0, 0, 0))
             if freq == 0:
                 return []
-            state.append((freq, list_type, pos))
+            doc_list = BlockSkipListExt.of(freq, list_type, self.mmap, pos)
+            state.append((freq, doc_list))
         state.sort(key=itemgetter(0))
         return state
 
@@ -214,19 +215,46 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         if not state:
             return []
 
-        freq_a, list_type_a, pos_a = state[0]
-        freq_b, list_type_b, pos_b = state[1]
-        list_a = BlockSkipListExt.of(freq_a, list_type_a, self.mmap, pos_a)
-        list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-        list_pos_a = list_a.intersection(list_b)
-        # find common doc ids
-        for freq_b, list_type_b, pos_b in state[2:]:
-            list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-            list_pos_a = list_b.intersection_with_doc_ids(self.mmap, list_pos_a)
-        return [decode_docid(self.mmap, pos) for pos in list_pos_a]
+        result = []
+        iters = [skip_list.get_iter() for _, skip_list in state]
+
+        # find a common doc id in the first and second list.
+        a_iter = iters[0]
+        pos_a = a_iter.get_pos()
+        b_iter = iters[1]
+        while True:
+            while True:
+                pos_b, cmp = b_iter.search(a_iter.mmap, pos_a)
+                if cmp > 0:
+                    pos_a, cmp_a = a_iter.search(b_iter.mmap, pos_b)
+                    if cmp_a == 0:
+                        break
+                    elif cmp_a < 0:
+                        return result
+                elif cmp == 0:
+                    break
+                else:  # reach to the end of b
+                    return result
+
+            # check the common doc id against the remains.
+            for it in iters[2:]:
+                pos_it, cmp = it.search(a_iter.mmap, pos_a)
+                if cmp > 0:
+                    pos_a, cmp_a = a_iter.search(it.mmap, pos_it)
+                    if cmp_a < 0:
+                        return result
+                    break
+                elif cmp < 0:  # reach to the end of the list
+                    return result
+            else:
+                result.append(decode_docid(a_iter.mmap, pos_a))
+                pos_a, cmp = a_iter.next_pos()
+                if cmp < 0:
+                    return result
 
     def count_and(self, tokens):
         if len(tokens) == 1:
+            # TODO self.data.get is overkill if there is a method to get freq of data.
             freq, _, _ = self.data.get(tokens[0], (0, 0, 0))
             return freq
 
@@ -234,16 +262,43 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         if not state:
             return 0
 
-        freq_a, list_type_a, pos_a = state[0]
-        freq_b, list_type_b, pos_b = state[1]
-        list_a = BlockSkipListExt.of(freq_a, list_type_a, self.mmap, pos_a)
-        list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-        list_pos_a = list_a.intersection(list_b)
-        # find common doc ids
-        for freq_b, list_type_b, pos_b in state[2:]:
-            list_b = BlockSkipListExt.of(freq_b, list_type_b, self.mmap, pos_b)
-            list_pos_a = list_b.intersection_with_doc_ids(self.mmap, list_pos_a)
-        return len(list_pos_a)
+        count = 0
+        iters = [skip_list.get_iter() for _, skip_list in state]
+
+        # find a common doc id in the first and second list.
+        a_iter = iters[0]
+        pos_a = a_iter.get_pos()
+        b_iter = iters[1]
+        iters2 = iters[2:]
+        while True:
+            while True:
+                pos_b, cmp = b_iter.search(a_iter.mmap, pos_a)
+                if cmp > 0:
+                    pos_a, cmp_a = a_iter.search(b_iter.mmap, pos_b)
+                    if cmp_a == 0:
+                        break
+                    elif cmp_a < 0:
+                        return count
+                elif cmp == 0:
+                    break
+                else:  # reach to the end of b
+                    return count
+
+            # check the common doc id against the remains.
+            for it in iters2:
+                pos_it, cmp = it.search(a_iter.mmap, pos_a)
+                if cmp > 0:
+                    pos_a, cmp_a = a_iter.search(it.mmap, pos_it)
+                    if cmp_a < 0:
+                        return count
+                    break
+                elif cmp < 0:  # reach to the end of the list
+                    return count
+            else:
+                count += 1
+                pos_a, cmp = a_iter.next_pos()
+                if cmp < 0:
+                    return count
 
     def clear(self):
         self.raw_data = {}
