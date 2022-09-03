@@ -220,11 +220,12 @@ class BlockSkipListExtIter(object):
 
     def __init__(self, block_skip_list):
         self.list = block_skip_list
-        self.mmap = self.list.mmap
-        self.last_block_idx = [self.list.level_block_idx[i] for i in range(self.list.max_level + 1)]
-        self.last_pos = [self._get_block_offset(self.list.level_block_idx[i]) + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-                         for i in range(self.list.max_level + 1)]
+        self.mmap = block_skip_list.mmap
+        self.last_block_idx = [block_skip_list.level_block_idx[i] for i in range(block_skip_list.max_level + 1)]
+        self.last_pos = [self._get_block_offset(block_skip_list.level_block_idx[i]) + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+                         for i in range(block_skip_list.max_level + 1)]
         self.last_cmp_pos = self.last_pos[:]
+        self.last_level = block_skip_list.max_level
 
     def _get_block_offset(self, idx):
         return self.list.offset + self.list.block_size * idx
@@ -240,10 +241,11 @@ class BlockSkipListExtIter(object):
 
     def search(self, mem_a, pos_a):
         # Check the start position.
-        level = 0
-        for level in range(self.list.max_level + 1):
-            if compare_docid(self.mmap, self.last_cmp_pos[level], mem_a, pos_a) >= 0:
+        level = self.last_level
+        while level < self.list.max_level:
+            if compare_docid(self.mmap, self.last_cmp_pos[level + 1], mem_a, pos_a) >= 0:
                 break
+            level += 1
         block_idx = self.last_block_idx[level]
         block_offset = self._get_block_offset(block_idx)
         block_end = self._get_block_end(block_offset)
@@ -281,6 +283,7 @@ class BlockSkipListExtIter(object):
                     self.last_block_idx[level] = block_idx
                     self.last_cmp_pos[level] = pos
                     self.last_pos[level] = pos
+                    self.last_level = level
                     return pos, cmp
             level -= 1
             pos += bytes_docid(self.mmap, pos)
@@ -300,16 +303,16 @@ class BlockSkipListExtIter(object):
                     block_idx = self._get_next_block_idx(block_offset)
                     if block_idx == 0:  # reached to the end of id list
                         self.last_block_idx[0] = last_block_idx
-                        self.last_cmp_pos[0] = last_pos
                         self.last_pos[0] = last_pos
+                        self.last_level = 0
                         return last_pos, cmp
                     block_offset = self._get_block_offset(block_idx)
                     block_end = self._get_block_end(block_offset)
                     pos = self._get_first_pos(block_offset)
             else:  # cmp >= 0
                 self.last_block_idx[0] = block_idx
-                self.last_cmp_pos[0] = pos
                 self.last_pos[0] = pos
+                self.last_level = 0
                 return pos, cmp
 
 
