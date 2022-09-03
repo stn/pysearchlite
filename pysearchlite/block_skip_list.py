@@ -180,28 +180,28 @@ class BlockSkipListExt(object):
         return result
 
     def intersection(self, b):
-        block_offset = self.offset
-        block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
-                     self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
-        pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+        a_iter = self.get_iter()
+        pos_a = a_iter.last_pos[0]
         b_iter = b.get_iter()
         result = []
         while True:
-            if pos >= block_end:
-                block_idx = int.from_bytes(
-                    self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
-                if block_idx == 0:
-                    break
-                block_offset = self.offset + self.block_size * block_idx
-                block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
-                             self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
-                pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
-            pos_b, cmp = b_iter.search(self.mmap, pos)
+            pos_b, cmp = b_iter.search(self.mmap, pos_a)
             if cmp == 0:
-                result.append(pos)
+                result.append(pos_a)
+                pos_a, cmp = a_iter.next_pos()
+                if cmp < 0:  # reached to the end of a
+                    break
             elif cmp < 0:  # reached to the end of b
                 break
-            pos += bytes_docid(self.mmap, pos)
+            else:
+                pos_a, cmp = a_iter.search(b.mmap, pos_b)
+                if cmp == 0:
+                    result.append(pos_a)
+                    pos_a, cmp = a_iter.next_pos()
+                    if cmp < 0:  # reached to the end of a
+                        break
+                elif cmp < 0:  # reached to the end of a
+                    break
         return result
 
     def intersection_with_doc_ids(self, mem_a, list_pos_a):
@@ -315,6 +315,34 @@ class BlockSkipListExtIter(object):
                 self.last_level = 0
                 return pos, cmp
 
+    def next_pos(self):
+        level = self.last_level
+        block_idx = self.last_block_idx[level]
+        block_offset = self._get_block_offset(block_idx)
+        pos = self.last_pos[level]
+        while level > 0:
+            pos += bytes_docid(self.mmap, pos)
+            block_idx = decode_block_idx(self.mmap, pos)
+            block_offset = self._get_block_offset(block_idx)
+            pos = self._get_first_pos(block_offset)
+            level -= 1
+            self.last_block_idx[level] = block_idx
+            self.last_cmp_pos[level] = pos
+            self.last_pos[level] = pos
+
+        pos += bytes_docid(self.mmap, pos)
+        block_end = self._get_block_end(block_offset)
+        if pos >= block_end:  # reach to the end of the block
+            block_idx = self._get_next_block_idx(block_offset)
+            if block_idx == 0:  # reached to the end of id list
+                return self.last_pos[0], -1
+            block_offset = self._get_block_offset(block_idx)
+            pos = self._get_first_pos(block_offset)
+            self.last_block_idx[0] = block_idx
+        self.last_pos[0] = pos
+        self.last_level = 0
+        return pos, 1
+
 
 class DocIdList(object):
 
@@ -353,6 +381,8 @@ class DocIdListExt(object):
             pos_b, cmp = b_iter.search(self.mmap, pos)
             if cmp == 0:
                 result.append(pos)
+            elif cmp < 0:  # reach to the end of list
+                break
             pos += bytes_docid(self.mmap, pos)
         return result
 
@@ -364,6 +394,8 @@ class DocIdListExt(object):
             pos_b, cmp = i.search(mem_a, pos_a)
             if cmp == 0:
                 result.append(pos_a)
+            elif cmp < 0:  # reach to the end of list
+                break
         return result
 
 
@@ -386,9 +418,18 @@ class DocIdListExtIter(object):
                 return pos, cmp
             i += 1
             if i >= self.list.freq:
-                break
+                self.current_idx = i - 1
+                self.current_pos = pos
+                return pos, -1
             pos += bytes_docid(self.mmap, pos)
-        return pos, cmp
+
+    def next_pos(self):
+        i = self.current_idx + 1
+        if i >= self.list.freq:
+            return self.current_pos, -1
+        self.current_pos += bytes_docid(self.mmap, self.current_pos)
+        self.current_idx = i
+        return self.current_pos, 1
 
 
 class SingleDocId(object):
@@ -428,6 +469,8 @@ class SingleDocIdExt(object):
             cmp = compare_docid(self.mmap, self.offset, mem_a, pos_a)
             if cmp == 0:
                 result.append(pos_a)
+            else:
+                break
         return result
 
 
@@ -437,6 +480,8 @@ class SingleDocIdExtIter(object):
         self.sdi = single_doc_id
 
     def search(self, mem_a, pos_a):
-        # it can return a smaller id than id_a.
         cmp = compare_docid(self.sdi.mmap, self.sdi.offset, mem_a, pos_a)
         return self.sdi.offset, cmp
+
+    def next_pos(self):
+        return self.sdi.offset, -1
