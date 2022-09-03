@@ -171,7 +171,7 @@ class BlockSkipListExt(object):
                     self.mmap[block_offset:block_offset + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder)
                 if block_idx == 0:
                     break
-                block_offset = self.offset + self.block_size * block_idx
+                block_offset = self.get_block_offset(block_idx)
                 block_size = self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES]
                 pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                 block_end = pos + block_size
@@ -185,7 +185,7 @@ class BlockSkipListExt(object):
             if compare_docid(self.mmap, self.last_cmp_pos[level], mem_a, pos_a) >= 0:
                 break
         block_idx = self.last_block_idx[level]
-        block_offset = self.offset + self.block_size * block_idx
+        block_offset = self.get_block_offset(block_idx)
         block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                      self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
         pos = self.last_pos[level]
@@ -210,7 +210,7 @@ class BlockSkipListExt(object):
                             self.last_pos[level] = last_pos
                             pos = last_pos
                             break  # down the level
-                        block_offset = self.offset + self.block_size * block_idx
+                        block_offset = self.get_block_offset(block_idx)
                         block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                                      self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                         pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
@@ -228,7 +228,7 @@ class BlockSkipListExt(object):
             level -= 1
             pos += bytes_docid(self.mmap, pos)
             block_idx = decode_block_idx(self.mmap, pos)
-            block_offset = self.offset + self.block_size * block_idx
+            block_offset = self.get_block_offset(block_idx)
             block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                          self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
             pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
@@ -248,7 +248,7 @@ class BlockSkipListExt(object):
                         self.last_cmp_pos[0] = last_pos
                         self.last_pos[0] = last_pos
                         return last_pos, cmp
-                    block_offset = self.offset + self.block_size * block_idx
+                    block_offset = self.get_block_offset(block_idx)
                     block_end = (block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1 +
                                  self.mmap[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES])
                     pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
@@ -299,6 +299,9 @@ class BlockSkipListExt(object):
         self.last_pos = [self.offset + self.block_size * self.level_block_idx[i] + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                          for i in range(self.max_level + 1)]
         self.last_cmp_pos = self.last_pos[:]
+
+    def get_block_offset(self, idx):
+        return self.offset + self.block_size * idx
 
 
 class DocIdList(object):
