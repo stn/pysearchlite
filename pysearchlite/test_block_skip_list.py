@@ -95,10 +95,10 @@ def test_block_skip_list_ext_search(arr, target):
         file.seek(0)
         mem = mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ)
         skip_list_ext = BlockSkipListExt.read(mem)
-        skip_list_ext.reset()
         # prepare target
         mem_target = bytearray(encode_docid(target))
-        ret, cmp = skip_list_ext.search(mem_target, 0)
+        skip_list_ext_iter = skip_list_ext.get_iter()
+        ret, cmp = skip_list_ext_iter.search(mem_target, 0)
         i = linear_search(arr, target)
         if i == len(arr):
             assert decode_docid(mem, ret) == arr[-1]
