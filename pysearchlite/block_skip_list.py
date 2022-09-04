@@ -225,7 +225,7 @@ class BlockSkipListExtIter(object):
         self.last_pos = [self._get_block_offset(self.last_block_idx[i]) + SKIP_LIST_BLOCK_INDEX_BYTES + 1
                          for i in range(block_skip_list.max_level + 1)]
         self.last_cmp_pos = self.last_pos[:]
-        self.last_level = block_skip_list.max_level
+        self.last_level = 0
 
     def _get_block_offset(self, idx):
         return self.list.offset + self.list.block_size * idx
