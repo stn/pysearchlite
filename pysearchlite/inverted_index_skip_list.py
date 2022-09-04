@@ -1,4 +1,3 @@
-import mmap
 import os
 import shutil
 import sys
@@ -41,16 +40,10 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         self.raw_data = {}
         self.data = {}
         self.file = None
-        self.mmap = None
+        self.mem = None
         self.tmp_index_num = 0
         self.raw_data_size = 0
         self.mem_limit = mem_limit
-
-    def __del__(self):
-        if self.mmap:
-            self.mmap.close()
-        if self.file:
-            self.file.close()
 
     def add(self, idx, tokens):
         for token in set(tokens):
@@ -153,47 +146,48 @@ class InvertedIndexBlockSkipList(InvertedIndex):
 
     def restore(self):
         self.data = {}
-        self.file = open(self.get_inverted_index_filename(), 'rb')
-        self.mmap = mmap.mmap(self.file.fileno(), length=0, access=mmap.ACCESS_READ)
-        token = read_token(self.mmap)
-        while token:
-            block_type = self.mmap.read(1)
-            if block_type == BLOCK_TYPE_DOC_ID:
-                pos = self.mmap.tell()
-                self.data[token] = (1, LIST_TYPE_DOC_ID, pos)
-                self.mmap.seek(bytes_docid(self.mmap, pos), 1)
-            elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
-                ids_len = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
-                pos = self.mmap.tell()
-                self.data[token] = (ids_len, LIST_TYPE_DOC_IDS_LIST, pos)
-                for _ in range(ids_len):
-                    pos += bytes_docid(self.mmap, pos)
-                self.mmap.seek(pos)
-            elif block_type == BLOCK_TYPE_SKIP_LIST:
-                freq = int.from_bytes(self.mmap.read(DOCID_LEN_BYTES), sys.byteorder)
-                pos = self.mmap.tell()
-                self.data[token] = (freq, LIST_TYPE_SKIP_LIST, pos)
-                block_size = int.from_bytes(self.mmap.read(1), sys.byteorder)
-                max_level = int.from_bytes(self.mmap.read(1), sys.byteorder)
-                self.mmap.seek(SKIP_LIST_BLOCK_INDEX_BYTES * max_level, 1)
-                blocks = int.from_bytes(self.mmap.read(SKIP_LIST_BLOCK_INDEX_BYTES), sys.byteorder)
-                self.mmap.seek(blocks * block_size, 1)
-            else:
-                raise ValueError(f"Unsupported block type: {block_type}")
-            token = read_token(self.mmap)
+        with open(self.get_inverted_index_filename(), 'rb') as file:
+            self.mem = file.read()
+            file.seek(0)
+            token = read_token(file)
+            while token:
+                block_type = file.read(1)
+                if block_type == BLOCK_TYPE_DOC_ID:
+                    pos = file.tell()
+                    self.data[token] = (1, LIST_TYPE_DOC_ID, pos)
+                    file.seek(bytes_docid(self.mem, pos), 1)
+                elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
+                    ids_len = int.from_bytes(file.read(DOCID_LEN_BYTES), sys.byteorder)
+                    pos = file.tell()
+                    self.data[token] = (ids_len, LIST_TYPE_DOC_IDS_LIST, pos)
+                    for _ in range(ids_len):
+                        pos += bytes_docid(self.mem, pos)
+                    file.seek(pos)
+                elif block_type == BLOCK_TYPE_SKIP_LIST:
+                    freq = int.from_bytes(file.read(DOCID_LEN_BYTES), sys.byteorder)
+                    pos = file.tell()
+                    self.data[token] = (freq, LIST_TYPE_SKIP_LIST, pos)
+                    block_size = int.from_bytes(file.read(1), sys.byteorder)
+                    max_level = int.from_bytes(file.read(1), sys.byteorder)
+                    file.seek(SKIP_LIST_BLOCK_INDEX_BYTES * max_level, 1)
+                    blocks = int.from_bytes(file.read(SKIP_LIST_BLOCK_INDEX_BYTES), sys.byteorder)
+                    file.seek(blocks * block_size, 1)
+                else:
+                    raise ValueError(f"Unsupported block type: {block_type}")
+                token = read_token(file)
 
     def get(self, token):
         freq, list_type, pos = self.data.get(token, (0, 0, 0))
         if freq == 0:
             return []
         elif freq == 1:
-            return [decode_docid(self.mmap, pos)]
+            return [decode_docid(self.mem, pos)]
         elif list_type == LIST_TYPE_DOC_IDS_LIST:
-            list_pos = DocIdListExt(self.mmap, pos, freq).get_ids()
-            return [decode_docid(self.mmap, pos) for pos in list_pos]
+            list_pos = DocIdListExt(self.mem, pos, freq).get_ids()
+            return [decode_docid(self.mem, pos) for pos in list_pos]
         elif list_type == LIST_TYPE_SKIP_LIST:
-            list_pos = BlockSkipListExt(self.mmap, pos, freq).get_ids()
-            return [decode_docid(self.mmap, pos) for pos in list_pos]
+            list_pos = BlockSkipListExt(self.mem, pos, freq).get_ids()
+            return [decode_docid(self.mem, pos) for pos in list_pos]
 
     def prepare_state(self, tokens):
         # confirm if all tokens are in index.
@@ -202,7 +196,7 @@ class InvertedIndexBlockSkipList(InvertedIndex):
             freq, list_type, pos = self.data.get(t, (0, 0, 0))
             if freq == 0:
                 return []
-            doc_list = BlockSkipListExt.of(freq, list_type, self.mmap, pos)
+            doc_list = BlockSkipListExt.of(freq, list_type, self.mem, pos)
             state.append((freq, doc_list))
         state.sort(key=itemgetter(0))
         return state
@@ -224,9 +218,9 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         b_iter = iters[1]
         while True:
             while True:
-                pos_b, cmp = b_iter.search(a_iter.mmap, pos_a)
+                pos_b, cmp = b_iter.search(a_iter.mem, pos_a)
                 if cmp > 0:
-                    pos_a, cmp_a = a_iter.search(b_iter.mmap, pos_b)
+                    pos_a, cmp_a = a_iter.search(b_iter.mem, pos_b)
                     if cmp_a == 0:
                         break
                     elif cmp_a < 0:
@@ -238,16 +232,16 @@ class InvertedIndexBlockSkipList(InvertedIndex):
 
             # check the common doc id against the remains.
             for it in iters[2:]:
-                pos_it, cmp = it.search(a_iter.mmap, pos_a)
+                pos_it, cmp = it.search(a_iter.mem, pos_a)
                 if cmp > 0:
-                    pos_a, cmp_a = a_iter.search(it.mmap, pos_it)
+                    pos_a, cmp_a = a_iter.search(it.mem, pos_it)
                     if cmp_a < 0:
                         return result
                     break
                 elif cmp < 0:  # reach to the end of the list
                     return result
             else:
-                result.append(decode_docid(a_iter.mmap, pos_a))
+                result.append(decode_docid(a_iter.mem, pos_a))
                 pos_a, cmp = a_iter.next_pos()
                 if cmp < 0:
                     return result
@@ -272,9 +266,9 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         iters2 = iters[2:]
         while True:
             while True:
-                pos_b, cmp = b_iter.search(a_iter.mmap, pos_a)
+                pos_b, cmp = b_iter.search(a_iter.mem, pos_a)
                 if cmp > 0:
-                    pos_a, cmp_a = a_iter.search(b_iter.mmap, pos_b)
+                    pos_a, cmp_a = a_iter.search(b_iter.mem, pos_b)
                     if cmp_a == 0:
                         break
                     elif cmp_a < 0:
@@ -286,9 +280,9 @@ class InvertedIndexBlockSkipList(InvertedIndex):
 
             # check the common doc id against the remains.
             for it in iters2:
-                pos_it, cmp = it.search(a_iter.mmap, pos_a)
+                pos_it, cmp = it.search(a_iter.mem, pos_a)
                 if cmp > 0:
-                    pos_a, cmp_a = a_iter.search(it.mmap, pos_it)
+                    pos_a, cmp_a = a_iter.search(it.mem, pos_it)
                     if cmp_a < 0:
                         return count
                     break
