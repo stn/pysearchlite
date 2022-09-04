@@ -212,16 +212,18 @@ def merge_ids(dst, src1, src2):
 
 
 def write_block_skip_list(skip_list, file):
+    # BLOCK_TYPE_SKIP_LIST(1) freq(DOCID_LEN_BYTES) block_size(1) max_level(1)
     file.write(BLOCK_TYPE_SKIP_LIST)
     file.write(skip_list.freq.to_bytes(DOCID_LEN_BYTES, sys.byteorder))
     file.write(skip_list.block_size.to_bytes(1, sys.byteorder))
     file.write(skip_list.max_level.to_bytes(1, sys.byteorder))
+    # [level_block_idx[i](SKIP_LIST_BLOCK_INDEX_BYTES) for i in 1..max_level+1]
     for i in range(1, skip_list.max_level + 1):
         file.write(skip_list.level_block_idx[i].to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
+    # len(blocks)(SKIP_LIST_BLOCK_INDEX_BYTES)
     file.write(len(skip_list.blocks).to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder))
     for i, block in enumerate(skip_list.blocks):
-        # TODO use variable bytes encoding
-        #b = encode_block_idx(skip_list.next_block_idx[i])
+        # next_block_idx(SKIP_LIST_BLOCK_INDEX_BYTES) len(block)(1) block 00 00 00
         b = skip_list.next_block_idx[i].to_bytes(SKIP_LIST_BLOCK_INDEX_BYTES, sys.byteorder)
         b += len(block).to_bytes(1, sys.byteorder)
         b += block
