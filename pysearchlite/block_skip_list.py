@@ -233,6 +233,15 @@ class BlockSkipListExtIter(object):
     def _get_first_pos(self, block_offset):
         return block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
 
+    def _get_second_pos(self, block_offset, level, block_end):
+        pos = block_offset + SKIP_LIST_BLOCK_INDEX_BYTES + 1
+        pos2 = pos + bytes_docid(self.mem, pos)
+        if level > 0:
+            pos2 += bytes_block_idx(self.mem, pos2)
+        if pos2 < block_end:
+            return pos2
+        return pos
+
     def _get_block_end(self, block_offset):
         return self._get_first_pos(block_offset) + self.mem[block_offset + SKIP_LIST_BLOCK_INDEX_BYTES]
 
@@ -293,7 +302,7 @@ class BlockSkipListExtIter(object):
             block_idx = decode_block_idx(self.mem, pos)
             block_offset = self._get_block_offset(block_idx)
             block_end = self._get_block_end(block_offset)
-            pos = self._get_first_pos(block_offset)
+            pos = self._get_second_pos(block_offset, level, block_end)
 
         # ids
         while True:
