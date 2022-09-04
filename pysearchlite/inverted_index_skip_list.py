@@ -3,6 +3,8 @@ import shutil
 import sys
 from operator import itemgetter
 
+import numpy as np
+
 from .block_skip_list import (
     BlockSkipList,
     BlockSkipListExt,
@@ -39,7 +41,6 @@ class InvertedIndexBlockSkipList(InvertedIndex):
         super().__init__(idx_dir)
         self.raw_data = {}
         self.data = {}
-        self.file = None
         self.mem = None
         self.tmp_index_num = 0
         self.raw_data_size = 0
@@ -146,9 +147,8 @@ class InvertedIndexBlockSkipList(InvertedIndex):
 
     def restore(self):
         self.data = {}
+        self.mem = np.fromfile(self.get_inverted_index_filename(), dtype=np.uint8)
         with open(self.get_inverted_index_filename(), 'rb') as file:
-            self.mem = file.read()
-            file.seek(0)
             token = read_token(file)
             while token:
                 block_type = file.read(1)

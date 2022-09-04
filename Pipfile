@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+numpy = "*"
 
 [dev-packages]
 pylint = "*"
@@ -11,4 +12,4 @@ pytest = "*"
 build = "*"
 
 [requires]
-python_version = "3.10"
+python_version = "3.9"
