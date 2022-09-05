@@ -121,38 +121,38 @@ class BlockSkipList(object):
 
 class BlockSkipListExt(object):
 
-    def __init__(self, mem, pos, freq):
+    def __init__(self, mem, freq):
         self.mem = mem
         # block_size(1) max_level(1) level_block_idx[max_level] num_blocks
-        self.block_size = int.from_bytes(mem[pos:pos+1], sys.byteorder)
-        self.max_level = int.from_bytes(mem[pos+1:pos+2], sys.byteorder)
+        self.block_size = int.from_bytes(mem[0:1], sys.byteorder)
+        self.max_level = int.from_bytes(mem[1:2], sys.byteorder)
         self.level_block_idx = [0]
         for i in range(self.max_level):
-            p = pos + 2 + i * SKIP_LIST_BLOCK_INDEX_BYTES
+            p = 2 + i * SKIP_LIST_BLOCK_INDEX_BYTES
             self.level_block_idx.append(int.from_bytes(mem[p:p + SKIP_LIST_BLOCK_INDEX_BYTES], sys.byteorder))
-        self.offset = pos + 2 + self.max_level * SKIP_LIST_BLOCK_INDEX_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES
+        self.offset = 2 + self.max_level * SKIP_LIST_BLOCK_INDEX_BYTES + SKIP_LIST_BLOCK_INDEX_BYTES
         self.freq = freq
 
     @staticmethod
-    def of(freq, list_type, mem, pos):
+    def of(freq, list_type, mem):
         if list_type == LIST_TYPE_DOC_ID:
-            return SingleDocIdExt(mem, pos)
+            return SingleDocIdExt(mem)
         elif list_type == LIST_TYPE_DOC_IDS_LIST:
-            return DocIdListExt(mem, pos, freq)
+            return DocIdListExt(mem, freq)
         elif list_type == LIST_TYPE_SKIP_LIST:
-            return BlockSkipListExt(mem, pos, freq)
+            return BlockSkipListExt(mem, freq)
 
     @staticmethod
     def read(mem):
         block_type = mem[0:1]  # TODO
         if block_type == BLOCK_TYPE_DOC_ID:
-            return SingleDocIdExt(mem, 1)
+            return SingleDocIdExt(mem[1:])
         elif block_type == BLOCK_TYPE_DOC_IDS_LIST:
             freq = int.from_bytes(mem[1:DOCID_LEN_BYTES + 1], sys.byteorder)
-            return DocIdListExt(mem, DOCID_LEN_BYTES + 1, freq)
+            return DocIdListExt(mem[DOCID_LEN_BYTES + 1:], freq)
         elif block_type == BLOCK_TYPE_SKIP_LIST:
             freq = int.from_bytes(mem[1:DOCID_LEN_BYTES + 1], sys.byteorder)
-            return BlockSkipListExt(mem, DOCID_LEN_BYTES + 1, freq)
+            return BlockSkipListExt(mem[DOCID_LEN_BYTES + 1:], freq)
         else:
             raise ValueError(f"Unsupported block type: {block_type}")
 
@@ -323,16 +323,15 @@ class DocIdList(object):
 
 class DocIdListExt(object):
 
-    def __init__(self, mem, offset, freq):
+    def __init__(self, mem, freq):
         self.freq = freq
         self.mem = mem
-        self.offset = offset
 
     def get_iter(self):
         return DocIdListExtIter(self)
 
     def get_ids(self):
-        pos = self.offset
+        pos = 0
         result = []
         for _ in range(self.freq):
             result.append(pos)
@@ -346,7 +345,7 @@ class DocIdListExtIter(object):
         self.list = doc_id_list
         self.mem = doc_id_list.mem
         self.current_idx = 0
-        self.current_pos = doc_id_list.offset
+        self.current_pos = 0
 
     def get_pos(self):
         return self.current_pos
@@ -387,29 +386,27 @@ class SingleDocId(object):
 
 class SingleDocIdExt(object):
 
-    def __init__(self, mem, offset):
+    def __init__(self, mem):
         self.mem = mem
-        self.offset = offset
 
     def get_iter(self):
         return SingleDocIdExtIter(self)
 
     def get_ids(self):
-        return [self.offset]
+        return [0]
 
 
 class SingleDocIdExtIter(object):
 
     def __init__(self, single_doc_id):
         self.mem = single_doc_id.mem
-        self.offset = single_doc_id.offset
 
     def get_pos(self):
-        return self.offset
+        return 0
 
     def search(self, mem_a, pos_a):
-        cmp = compare_docid(self.mem, self.offset, mem_a, pos_a)
-        return self.offset, cmp
+        cmp = compare_docid(self.mem, 0, mem_a, pos_a)
+        return 0, cmp
 
     def next_pos(self):
-        return self.offset, -1
+        return 0, -1

@@ -93,7 +93,7 @@ def test_block_skip_list_ext_search(arr, target):
     with TemporaryFile(prefix="pysearchlite_") as file:
         skip_list.write(file)
         file.seek(0)
-        mem = mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ)
+        mem = file.read()
         skip_list_ext = BlockSkipListExt.read(mem)
         # prepare target
         mem_target = bytearray(encode_docid(target))
@@ -101,9 +101,9 @@ def test_block_skip_list_ext_search(arr, target):
         ret, cmp = skip_list_ext_iter.search(mem_target, 0)
         i = linear_search(arr, target)
         if i == len(arr):
-            assert decode_docid(mem, ret) == arr[-1]
+            assert decode_docid(skip_list_ext.mem, ret) == arr[-1]
         else:
-            assert decode_docid(mem, ret) == arr[i]
+            assert decode_docid(skip_list_ext.mem, ret) == arr[i]
 
 
 def skip_list_and_test_cases(num, max_len):
