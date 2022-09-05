@@ -179,42 +179,6 @@ class BlockSkipListExt(object):
             pos += bytes_docid(self.mem, pos)
         return result
 
-    def intersection(self, b):
-        a_iter = self.get_iter()
-        pos_a = a_iter.last_pos[0]
-        b_iter = b.get_iter()
-        result = []
-        while True:
-            pos_b, cmp = b_iter.search(self.mem, pos_a)
-            if cmp == 0:
-                result.append(pos_a)
-                pos_a, cmp = a_iter.next_pos()
-                if cmp < 0:  # reached to the end of a
-                    break
-            elif cmp < 0:  # reached to the end of b
-                break
-            else:
-                pos_a, cmp = a_iter.search(b.mem, pos_b)
-                if cmp == 0:
-                    result.append(pos_a)
-                    pos_a, cmp = a_iter.next_pos()
-                    if cmp < 0:  # reached to the end of a
-                        break
-                elif cmp < 0:  # reached to the end of a
-                    break
-        return result
-
-    def intersection_with_doc_ids(self, mem_a, list_pos_a):
-        i = self.get_iter()
-        result = []
-        for pos_a in list_pos_a:
-            pos_b, cmp = i.search(mem_a, pos_a)
-            if cmp == 0:
-                result.append(pos_a)
-            elif cmp < 0:  # reached to the end of b
-                break
-        return result
-
 
 class BlockSkipListExtIter(object):
 
@@ -375,32 +339,6 @@ class DocIdListExt(object):
             pos += bytes_docid(self.mem, pos)
         return result
 
-    def intersection(self, b):
-        pos = self.offset
-        b_iter = b.get_iter()
-        result = []
-        # assume len(a) < len(b)
-        for i in range(self.freq):
-            pos_b, cmp = b_iter.search(self.mem, pos)
-            if cmp == 0:
-                result.append(pos)
-            elif cmp < 0:  # reach to the end of list
-                break
-            pos += bytes_docid(self.mem, pos)
-        return result
-
-    def intersection_with_doc_ids(self, mem_a, list_pos_a):
-        i = self.get_iter()
-        result = []
-        # assume len(a) < len(b)
-        for pos_a in list_pos_a:
-            pos_b, cmp = i.search(mem_a, pos_a)
-            if cmp == 0:
-                result.append(pos_a)
-            elif cmp < 0:  # reach to the end of list
-                break
-        return result
-
 
 class DocIdListExtIter(object):
 
@@ -458,26 +396,6 @@ class SingleDocIdExt(object):
 
     def get_ids(self):
         return [self.offset]
-
-    def intersection(self, b):
-        # assume a < b
-        i = b.get_iter()
-        pos_b, cmp = i.search(self.mem, self.offset)
-        result = []
-        if cmp == 0:
-            result.append(self.offset)
-        return result
-
-    def intersection_with_doc_ids(self, mem_a, list_pos_a):
-        result = []
-        # assume a < this. so len(a) should be 1.
-        for pos_a in list_pos_a:
-            cmp = compare_docid(self.mem, self.offset, mem_a, pos_a)
-            if cmp == 0:
-                result.append(pos_a)
-            else:
-                break
-        return result
 
 
 class SingleDocIdExtIter(object):
