@@ -7,7 +7,6 @@ from pysearchlite.gamma_codecs import (
     BLOCK_TYPE_SKIP_LIST,
     DOCID_LEN_BYTES,
     SKIP_LIST_BLOCK_INDEX_BYTES,
-    compare_docid,
     decode_block_idx,
     encode_block_idx,
     encode_docid,
@@ -15,9 +14,10 @@ from pysearchlite.gamma_codecs import (
     write_doc_ids_list,
     write_single_doc_id,
 )
-from pysearchlite.gamma_codecs_cffi import (
+from .gamma_codecs_cffi import (
     bytes_docid,
     bytes_block_idx,
+    compare_docid,
 )
 
 SKIPLIST_BLOCK_SIZE = int(os.environ.get('PYSEARCHLITE_SKIPLIST_BLOCK_SIZE', '44'))
