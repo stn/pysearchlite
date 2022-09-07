@@ -26,8 +26,8 @@ from .gamma_codecs import (
     read_token,
     write_doc_ids,
     write_token,
+    bytes_docid,
 )
-from .gamma_codecs_cffi import bytes_docid
 from .inverted_index import InvertedIndex
 
 

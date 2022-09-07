@@ -13,10 +13,10 @@ from pysearchlite.gamma_codecs import (
     write_block_skip_list,
     write_doc_ids_list,
     write_single_doc_id,
-)
-from .gamma_codecs_cffi import (
     bytes_docid,
     bytes_block_idx,
+)
+from pysearchlite.gamma_codecs_cffi import (
     compare_docid,
 )
 
